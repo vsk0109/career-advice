@@ -1,0 +1,145 @@
+[
+  {
+    "id": "data-scientist",
+    "name": "Data Scientist",
+    "description": "Analyzes large datasets to uncover patterns and drive business or research decisions.",
+    "riasec_tags": {"R": 2, "I": 9, "A": 3, "S": 2, "E": 5, "C": 6},
+    "relevant_subjects": ["Math", "Computer Science", "Statistics"],
+    "required_skills": ["Python", "Statistics", "Machine Learning", "Communication"],
+    "interest_tags": ["technology", "problem-solving", "research", "data"],
+    "courses": [
+      {"name": "B.Sc Statistics", "level": "undergrad"},
+      {"name": "B.Tech Computer Science", "level": "undergrad"}
+    ],
+    "colleges": [
+      {"name": "IIT Bombay", "location": "Mumbai"},
+      {"name": "ISI Kolkata", "location": "Kolkata"}
+    ],
+    "scholarships": [
+      {"name": "AICTE Pragati Scholarship", "eligibility": "Girl students in technical undergraduate courses", "link": "https://www.aicte-india.org/"}
+    ],
+    "certifications": [
+      {"name": "Google Data Analytics Certificate", "provider": "Coursera"},
+      {"name": "IBM Data Science Professional Certificate", "provider": "Coursera"}
+    ],
+    "emerging": true
+  },
+  {
+    "id": "software-engineer",
+    "name": "Software Engineer",
+    "description": "Designs, builds, and maintains software applications and systems.",
+    "riasec_tags": {"R": 3, "I": 8, "A": 3, "S": 2, "E": 4, "C": 6},
+    "relevant_subjects": ["Math", "Computer Science", "Physics"],
+    "required_skills": ["Coding", "Problem Solving", "Teamwork", "Debugging"],
+    "interest_tags": ["technology", "coding", "problem-solving"],
+    "courses": [
+      {"name": "B.Tech Computer Science", "level": "undergrad"},
+      {"name": "B.Sc Computer Science", "level": "undergrad"}
+    ],
+    "colleges": [
+      {"name": "IIT Delhi", "location": "Delhi"},
+      {"name": "BITS Pilani", "location": "Pilani"}
+    ],
+    "scholarships": [
+      {"name": "Central Sector Scholarship Scheme", "eligibility": "Merit-based, general undergrad", "link": "https://scholarships.gov.in/"}
+    ],
+    "certifications": [
+      {"name": "Meta Front-End Developer Certificate", "provider": "Coursera"}
+    ],
+    "emerging": false
+  },
+  {
+    "id": "ux-designer",
+    "name": "UX/UI Designer",
+    "description": "Designs intuitive, user-friendly digital experiences for apps and websites.",
+    "riasec_tags": {"R": 1, "I": 5, "A": 9, "S": 5, "E": 4, "C": 3},
+    "relevant_subjects": ["Art", "Computer Science", "Psychology"],
+    "required_skills": ["Design Tools", "Creativity", "User Research", "Communication"],
+    "interest_tags": ["design", "art", "technology", "creativity"],
+    "courses": [
+      {"name": "B.Des in Interaction Design", "level": "undergrad"},
+      {"name": "B.Sc Psychology", "level": "undergrad"}
+    ],
+    "colleges": [
+      {"name": "NID Ahmedabad", "location": "Ahmedabad"},
+      {"name": "IIT Guwahati (Design)", "location": "Guwahati"}
+    ],
+    "scholarships": [
+      {"name": "NID Merit Scholarship", "eligibility": "Merit-based for design undergrads"}
+    ],
+    "certifications": [
+      {"name": "Google UX Design Certificate", "provider": "Coursera"}
+    ],
+    "emerging": true
+  },
+  {
+    "id": "psychologist",
+    "name": "Clinical Psychologist",
+    "description": "Assesses and supports individuals' mental health and emotional wellbeing.",
+    "riasec_tags": {"R": 1, "I": 7, "A": 3, "S": 9, "E": 2, "C": 3},
+    "relevant_subjects": ["Psychology", "Biology", "English"],
+    "required_skills": ["Communication", "Empathy", "Research", "Active Listening"],
+    "interest_tags": ["helping", "psychology", "counseling", "healthcare"],
+    "courses": [
+      {"name": "B.A/B.Sc Psychology", "level": "undergrad"},
+      {"name": "M.A Clinical Psychology", "level": "postgrad"}
+    ],
+    "colleges": [
+      {"name": "Delhi University", "location": "Delhi"},
+      {"name": "TISS Mumbai", "location": "Mumbai"}
+    ],
+    "scholarships": [
+      {"name": "National Merit Scholarship", "eligibility": "Merit-based general"}
+    ],
+    "certifications": [
+      {"name": "Foundations of Positive Psychology", "provider": "Coursera"}
+    ],
+    "emerging": false
+  },
+  {
+    "id": "entrepreneur",
+    "name": "Business Entrepreneur",
+    "description": "Starts and grows new ventures, identifying market opportunities and leading teams.",
+    "riasec_tags": {"R": 2, "I": 5, "A": 4, "S": 4, "E": 9, "C": 5},
+    "relevant_subjects": ["Economics", "Business Studies", "Math"],
+    "required_skills": ["Leadership", "Communication", "Financial Literacy", "Risk-Taking"],
+    "interest_tags": ["business", "leadership", "innovation"],
+    "courses": [
+      {"name": "BBA", "level": "undergrad"},
+      {"name": "B.Com", "level": "undergrad"}
+    ],
+    "colleges": [
+      {"name": "Shaheed Sukhdev College of Business Studies", "location": "Delhi"},
+      {"name": "NMIMS Mumbai", "location": "Mumbai"}
+    ],
+    "scholarships": [
+      {"name": "Young Entrepreneur Scholarship", "eligibility": "Students with a startup idea/pitch"}
+    ],
+    "certifications": [
+      {"name": "Entrepreneurship Specialization", "provider": "Coursera (Wharton)"}
+    ],
+    "emerging": false
+  },
+  {
+    "id": "environmental-scientist",
+    "name": "Environmental Scientist",
+    "description": "Studies environmental problems and develops solutions for sustainability.",
+    "riasec_tags": {"R": 5, "I": 8, "A": 2, "S": 4, "E": 3, "C": 4},
+    "relevant_subjects": ["Biology", "Chemistry", "Geography"],
+    "required_skills": ["Research", "Data Analysis", "Fieldwork", "Report Writing"],
+    "interest_tags": ["environment", "science", "sustainability", "research"],
+    "courses": [
+      {"name": "B.Sc Environmental Science", "level": "undergrad"}
+    ],
+    "colleges": [
+      {"name": "TERI School of Advanced Studies", "location": "Delhi"}
+    ],
+    "scholarships": [
+      {"name": "Green Talent Scholarship", "eligibility": "Sustainability-focused students"}
+    ],
+    "certifications": [
+      {"name": "Sustainability and Environmental Management", "provider": "edX"}
+    ],
+    "emerging": true
+  }
+]
