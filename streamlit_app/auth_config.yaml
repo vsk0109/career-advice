@@ -1,0 +1,28 @@
+# Auth config for streamlit-authenticator.
+#
+# IMPORTANT: replace the placeholder hashes below with real ones generated
+# by running `python3 generate_hashes.py`. The placeholders here will NOT
+# work as-is — they're structurally correct examples only.
+#
+# For a public GitHub repo, add this file to .gitignore and have each
+# teammate keep their own local copy — don't commit real credentials,
+# even hashed ones, to a public repo.
+
+credentials:
+  usernames:
+    vaishnavi:
+      email: vaishnavi@example.com
+      name: Vaishnavi Sudarsan K
+      password: $2b$12$qOsNDxHY.fT7BFjucLAltu5cp3yv7V.BG8WNa10obLv6Gj4Haj.cC
+    guest:
+      email: guest@example.com
+      name: Expo Guest
+      password: $2b$12$VhPYFudPGZ1MmCWR4DPnzOlovvDaOy.eM4mh2RvcT4Wu5RGbVX0z2
+
+cookie:
+  name: career_compass_auth
+  key: this_is_secret
+  expiry_days: 7
+
+preauthorized:
+  emails: []
