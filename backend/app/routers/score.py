@@ -32,4 +32,7 @@ def score_insights(payload: InsightsRequest):
     top_matches = [m.model_dump() for m in payload.top_matches]
     insights = generate_career_insights(profile, top_matches)
 
+    if top_matches:
+        db.save_roadmap(payload.student_id, top_matches[0]["career"], insights["roadmap"])
+
     return InsightsResponse(**insights)

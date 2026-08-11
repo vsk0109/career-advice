@@ -76,7 +76,7 @@ Given a student_id (or a full profile inline), returns ranked career matches.
 ---
 
 ### `POST /score/insights`
-Given the `/score` output, calls the LLM to generate explanation text + roadmap. Split from `/score` so the deterministic ranking is fast and testable independently of the (slower, less reliable) LLM call.
+Given the `/score` output, calls the LLM to generate explanation text + roadmap. Split from `/score` so the deterministic ranking is fast and testable independently of the (slower, less reliable) LLM call. The generated roadmap for the top match is persisted to `roadmap_steps` (see `GET /roadmap/{student_id}`).
 
 **Request body:**
 ```json
@@ -103,7 +103,9 @@ If the LLM call fails, return a graceful fallback (see `02_ARCHITECTURE.md` — 
 ---
 
 ### `POST /mentor/chat`
-Chat-based mentor, uses profile + top matches as context.
+Chat-based mentor, uses profile + top matches as context. Persists both the
+student's message and the AI reply to `mentor_chat`, and includes the last
+6 turns of prior conversation as context for the LLM.
 
 **Request body:**
 ```json
@@ -117,6 +119,50 @@ Chat-based mentor, uses profile + top matches as context.
 ```json
 { "reply": "Given your strong Math and Investigative + Realistic personality profile, ..." }
 ```
+
+---
+
+### `GET /mentor/chat/{student_id}`
+Returns the full chat history for a student, oldest first.
+
+**Response:**
+```json
+{
+  "messages": [
+    { "sender": "student", "message": "...", "created_at": "2026-08-11T20:00:00" },
+    { "sender": "ai", "message": "...", "created_at": "2026-08-11T20:00:02" }
+  ]
+}
+```
+
+---
+
+### `GET /roadmap/{student_id}`
+Returns the student's roadmap steps (across all careers they've generated
+insights for), with completion status. Roadmap steps are created by
+`POST /score/insights` — each call replaces the stored roadmap for that
+student+career with the freshly generated one.
+
+**Response:**
+```json
+{
+  "steps": [
+    { "step_id": 1, "career": "Data Scientist", "step_number": 1, "description": "Step 1: ...", "completed": false }
+  ]
+}
+```
+
+---
+
+### `PATCH /roadmap/{student_id}/steps/{step_id}`
+Marks a roadmap step complete/incomplete.
+
+**Request body:**
+```json
+{ "completed": true }
+```
+
+**Response:** the updated step, same shape as in `GET /roadmap/{student_id}`.
 
 ---
 
