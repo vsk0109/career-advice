@@ -1,0 +1,727 @@
+-- ============================================================
+-- AI CAREER MENTOR - MYSQL DATABASE
+-- Database: career_mentor
+-- ============================================================
+
+DROP DATABASE IF EXISTS career_mentor;
+CREATE DATABASE career_mentor;
+USE career_mentor;
+
+-- ============================================================
+-- 1. STUDENTS
+-- ============================================================
+CREATE TABLE students (
+    student_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(150) UNIQUE,
+    age INT,
+    gender VARCHAR(20),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================
+-- 2. STUDENT INTERESTS
+-- ============================================================
+CREATE TABLE student_interests (
+    interest_id INT AUTO_INCREMENT PRIMARY KEY,
+    student_id INT NOT NULL,
+    interest VARCHAR(100) NOT NULL,
+    FOREIGN KEY (student_id) REFERENCES students(student_id)
+        ON DELETE CASCADE
+);
+
+-- ============================================================
+-- 3. STUDENT HOBBIES
+-- ============================================================
+CREATE TABLE student_hobbies (
+    hobby_id INT AUTO_INCREMENT PRIMARY KEY,
+    student_id INT NOT NULL,
+    hobby VARCHAR(100) NOT NULL,
+    FOREIGN KEY (student_id) REFERENCES students(student_id)
+        ON DELETE CASCADE
+);
+
+-- ============================================================
+-- 4. STUDENT ACADEMICS
+-- ============================================================
+CREATE TABLE student_academics (
+    academic_id INT AUTO_INCREMENT PRIMARY KEY,
+    student_id INT NOT NULL,
+    subject VARCHAR(100) NOT NULL,
+    marks DECIMAL(5,2),
+    FOREIGN KEY (student_id) REFERENCES students(student_id)
+        ON DELETE CASCADE
+);
+
+-- ============================================================
+-- 5. STUDENT RIASEC PROFILE
+-- ============================================================
+CREATE TABLE student_riasec (
+    riasec_id INT AUTO_INCREMENT PRIMARY KEY,
+    student_id INT NOT NULL UNIQUE,
+    realistic_score DECIMAL(5,2) DEFAULT 0,
+    investigative_score DECIMAL(5,2) DEFAULT 0,
+    artistic_score DECIMAL(5,2) DEFAULT 0,
+    social_score DECIMAL(5,2) DEFAULT 0,
+    enterprising_score DECIMAL(5,2) DEFAULT 0,
+    conventional_score DECIMAL(5,2) DEFAULT 0,
+    FOREIGN KEY (student_id) REFERENCES students(student_id)
+        ON DELETE CASCADE
+);
+
+-- ============================================================
+-- 6. STUDENT SKILLS
+-- ============================================================
+CREATE TABLE student_skills (
+    student_skill_id INT AUTO_INCREMENT PRIMARY KEY,
+    student_id INT NOT NULL,
+    skill_name VARCHAR(100) NOT NULL,
+    skill_level INT CHECK (skill_level BETWEEN 1 AND 5),
+    FOREIGN KEY (student_id) REFERENCES students(student_id)
+        ON DELETE CASCADE
+);
+
+-- ============================================================
+-- 7. CAREERS
+-- ============================================================
+CREATE TABLE careers (
+    career_id INT AUTO_INCREMENT PRIMARY KEY,
+    career_name VARCHAR(150) NOT NULL,
+    description TEXT,
+    realistic_score DECIMAL(5,2) DEFAULT 0,
+    investigative_score DECIMAL(5,2) DEFAULT 0,
+    artistic_score DECIMAL(5,2) DEFAULT 0,
+    social_score DECIMAL(5,2) DEFAULT 0,
+    enterprising_score DECIMAL(5,2) DEFAULT 0,
+    conventional_score DECIMAL(5,2) DEFAULT 0
+);
+
+-- ============================================================
+-- 8. CAREER SKILLS
+-- ============================================================
+CREATE TABLE career_skills (
+    career_skill_id INT AUTO_INCREMENT PRIMARY KEY,
+    career_id INT NOT NULL,
+    skill_name VARCHAR(100) NOT NULL,
+    required_level INT CHECK (required_level BETWEEN 1 AND 5),
+    FOREIGN KEY (career_id) REFERENCES careers(career_id)
+        ON DELETE CASCADE
+);
+
+-- ============================================================
+-- 9. CAREER SUBJECTS
+-- ============================================================
+CREATE TABLE career_subjects (
+    career_subject_id INT AUTO_INCREMENT PRIMARY KEY,
+    career_id INT NOT NULL,
+    subject VARCHAR(100) NOT NULL,
+    FOREIGN KEY (career_id) REFERENCES careers(career_id)
+        ON DELETE CASCADE
+);
+
+-- ============================================================
+-- 10. COURSES
+-- ============================================================
+CREATE TABLE courses (
+    course_id INT AUTO_INCREMENT PRIMARY KEY,
+    course_name VARCHAR(150) NOT NULL,
+    level VARCHAR(50),
+    description TEXT
+);
+
+-- ============================================================
+-- 11. CAREER <-> COURSE
+-- ============================================================
+CREATE TABLE career_courses (
+    career_id INT NOT NULL,
+    course_id INT NOT NULL,
+    PRIMARY KEY (career_id, course_id),
+    FOREIGN KEY (career_id) REFERENCES careers(career_id)
+        ON DELETE CASCADE,
+    FOREIGN KEY (course_id) REFERENCES courses(course_id)
+        ON DELETE CASCADE
+);
+
+-- ============================================================
+-- 12. UNIVERSITIES
+-- ============================================================
+CREATE TABLE universities (
+    university_id INT AUTO_INCREMENT PRIMARY KEY,
+    university_name VARCHAR(200) NOT NULL,
+    location VARCHAR(200),
+    website VARCHAR(300)
+);
+
+-- ============================================================
+-- 13. COURSE <-> UNIVERSITY
+-- ============================================================
+CREATE TABLE course_universities (
+    course_id INT NOT NULL,
+    university_id INT NOT NULL,
+    PRIMARY KEY (course_id, university_id),
+    FOREIGN KEY (course_id) REFERENCES courses(course_id)
+        ON DELETE CASCADE,
+    FOREIGN KEY (university_id) REFERENCES universities(university_id)
+        ON DELETE CASCADE
+);
+
+-- ============================================================
+-- 14. SCHOLARSHIPS
+-- ============================================================
+CREATE TABLE scholarships (
+    scholarship_id INT AUTO_INCREMENT PRIMARY KEY,
+    scholarship_name VARCHAR(200) NOT NULL,
+    provider VARCHAR(200),
+    description TEXT,
+    eligibility TEXT,
+    amount VARCHAR(100),
+    application_url VARCHAR(500)
+);
+
+-- ============================================================
+-- 15. CAREER <-> SCHOLARSHIP
+-- ============================================================
+CREATE TABLE career_scholarships (
+    career_id INT NOT NULL,
+    scholarship_id INT NOT NULL,
+    PRIMARY KEY (career_id, scholarship_id),
+    FOREIGN KEY (career_id) REFERENCES careers(career_id)
+        ON DELETE CASCADE,
+    FOREIGN KEY (scholarship_id) REFERENCES scholarships(scholarship_id)
+        ON DELETE CASCADE
+);
+
+-- ============================================================
+-- 16. CAREER RECOMMENDATIONS
+-- ============================================================
+CREATE TABLE career_recommendations (
+    recommendation_id INT AUTO_INCREMENT PRIMARY KEY,
+    student_id INT NOT NULL,
+    career_id INT NOT NULL,
+    suitability_score DECIMAL(5,2),
+    explanation TEXT,
+    recommended_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (student_id) REFERENCES students(student_id)
+        ON DELETE CASCADE,
+    FOREIGN KEY (career_id) REFERENCES careers(career_id)
+        ON DELETE CASCADE
+);
+
+-- ============================================================
+-- 17. SKILL GAPS
+-- ============================================================
+CREATE TABLE skill_gaps (
+    gap_id INT AUTO_INCREMENT PRIMARY KEY,
+    student_id INT NOT NULL,
+    career_id INT NOT NULL,
+    skill_name VARCHAR(100) NOT NULL,
+    current_level INT,
+    required_level INT,
+    gap_value INT,
+    FOREIGN KEY (student_id) REFERENCES students(student_id)
+        ON DELETE CASCADE,
+    FOREIGN KEY (career_id) REFERENCES careers(career_id)
+        ON DELETE CASCADE
+);
+
+-- ============================================================
+-- 18. ROADMAP STEPS
+-- ============================================================
+CREATE TABLE roadmap_steps (
+    roadmap_id INT AUTO_INCREMENT PRIMARY KEY,
+    student_id INT NOT NULL,
+    career_id INT,
+    step_number INT NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    description TEXT,
+    completed BOOLEAN DEFAULT FALSE,
+    FOREIGN KEY (student_id) REFERENCES students(student_id)
+        ON DELETE CASCADE,
+    FOREIGN KEY (career_id) REFERENCES careers(career_id)
+        ON DELETE SET NULL
+);
+
+-- ============================================================
+-- 19. PROGRESS
+-- ============================================================
+CREATE TABLE progress (
+    progress_id INT AUTO_INCREMENT PRIMARY KEY,
+    student_id INT NOT NULL,
+    roadmap_id INT,
+    completed BOOLEAN DEFAULT FALSE,
+    completed_at TIMESTAMP NULL,
+    FOREIGN KEY (student_id) REFERENCES students(student_id)
+        ON DELETE CASCADE,
+    FOREIGN KEY (roadmap_id) REFERENCES roadmap_steps(roadmap_id)
+        ON DELETE CASCADE
+);
+
+-- ============================================================
+-- 20. AI MENTOR CHAT
+-- ============================================================
+CREATE TABLE mentor_chat (
+    message_id INT AUTO_INCREMENT PRIMARY KEY,
+    student_id INT NOT NULL,
+    sender ENUM('student', 'ai') NOT NULL,
+    message TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (student_id) REFERENCES students(student_id)
+        ON DELETE CASCADE
+);
+
+-- ============================================================
+-- SAMPLE STUDENT
+-- ============================================================
+INSERT INTO students (name, email, age, gender)
+VALUES ('Demo Student', 'demo@student.com', 21, 'Other');
+
+-- Student interests
+INSERT INTO student_interests (student_id, interest) VALUES
+(1, 'Technology'),
+(1, 'Data Science'),
+(1, 'Problem Solving'),
+(1, 'Artificial Intelligence');
+
+-- Student hobbies
+INSERT INTO student_hobbies (student_id, hobby) VALUES
+(1, 'Coding'),
+(1, 'Reading'),
+(1, 'Learning New Technologies');
+
+-- Student academics
+INSERT INTO student_academics (student_id, subject, marks) VALUES
+(1, 'Mathematics', 90),
+(1, 'Physics', 85),
+(1, 'Computer Science', 92),
+(1, 'English', 78),
+(1, 'Statistics', 88);
+
+-- Sample RIASEC profile
+INSERT INTO student_riasec
+(student_id, realistic_score, investigative_score, artistic_score,
+ social_score, enterprising_score, conventional_score)
+VALUES
+(1, 4.0, 10.0, 3.0, 5.0, 5.0, 8.0);
+
+-- Student self-rated skills
+INSERT INTO student_skills (student_id, skill_name, skill_level) VALUES
+(1, 'Programming', 4),
+(1, 'Analytical Thinking', 5),
+(1, 'Communication', 3),
+(1, 'Problem Solving', 5),
+(1, 'Leadership', 3),
+(1, 'Creativity', 4);
+
+-- ============================================================
+-- SAMPLE CAREERS
+-- ============================================================
+INSERT INTO careers
+(career_name, description, realistic_score, investigative_score,
+ artistic_score, social_score, enterprising_score, conventional_score)
+VALUES
+('Software Engineer',
+ 'Designs, develops, tests and maintains software applications.',
+ 5, 9, 3, 3, 5, 7),
+
+('Data Scientist',
+ 'Uses statistics, programming and machine learning to analyze data and build predictive models.',
+ 2, 9, 3, 2, 5, 6),
+
+('Machine Learning Engineer',
+ 'Builds and deploys machine learning models and AI systems.',
+ 4, 10, 3, 2, 5, 7),
+
+('Data Analyst',
+ 'Analyzes data and creates reports and dashboards to support decisions.',
+ 2, 8, 3, 4, 5, 8),
+
+('Cybersecurity Analyst',
+ 'Protects computer systems, networks and data from security threats.',
+ 5, 9, 2, 3, 5, 8),
+
+('Web Developer',
+ 'Creates and maintains websites and web applications.',
+ 4, 8, 5, 3, 5, 6),
+
+('UI/UX Designer',
+ 'Designs user interfaces and user experiences for digital products.',
+ 2, 6, 9, 6, 5, 4),
+
+('Business Analyst',
+ 'Analyzes business requirements and helps organizations improve processes.',
+ 2, 7, 4, 7, 8, 8),
+
+('Cloud Engineer',
+ 'Designs, deploys and manages cloud infrastructure and services.',
+ 7, 8, 2, 3, 6, 8),
+
+('Database Administrator',
+ 'Manages databases, performance, security, backup and recovery.',
+ 4, 8, 2, 3, 5, 9),
+
+('AI Research Scientist',
+ 'Researches artificial intelligence and develops new AI methods and models.',
+ 3, 10, 4, 3, 5, 7),
+
+('Product Manager',
+ 'Leads product strategy, development and coordination between teams.',
+ 3, 7, 4, 8, 10, 7);
+
+-- ============================================================
+-- CAREER SKILLS
+-- ============================================================
+INSERT INTO career_skills (career_id, skill_name, required_level) VALUES
+(1, 'Programming', 5),
+(1, 'Problem Solving', 5),
+(1, 'Analytical Thinking', 4),
+(1, 'Communication', 3),
+
+(2, 'Python', 5),
+(2, 'Statistics', 5),
+(2, 'Analytical Thinking', 5),
+(2, 'Machine Learning', 4),
+
+(3, 'Python', 5),
+(3, 'Machine Learning', 5),
+(3, 'Programming', 5),
+(3, 'Problem Solving', 5),
+
+(4, 'SQL', 5),
+(4, 'Analytical Thinking', 5),
+(4, 'Statistics', 4),
+(4, 'Communication', 4),
+
+(5, 'Cybersecurity', 5),
+(5, 'Problem Solving', 5),
+(5, 'Networking', 4),
+(5, 'Analytical Thinking', 5),
+
+(6, 'HTML/CSS', 5),
+(6, 'JavaScript', 5),
+(6, 'Programming', 4),
+(6, 'Creativity', 4),
+
+(7, 'Creativity', 5),
+(7, 'UI Design', 5),
+(7, 'Communication', 4),
+(7, 'Problem Solving', 4),
+
+(8, 'Analytical Thinking', 5),
+(8, 'Communication', 5),
+(8, 'Problem Solving', 4),
+(8, 'Business Knowledge', 4),
+
+(9, 'Cloud Computing', 5),
+(9, 'Networking', 4),
+(9, 'Linux', 4),
+(9, 'Problem Solving', 4),
+
+(10, 'SQL', 5),
+(10, 'Database Management', 5),
+(10, 'Problem Solving', 4),
+(10, 'Analytical Thinking', 4),
+
+(11, 'Python', 5),
+(11, 'Mathematics', 5),
+(11, 'Machine Learning', 5),
+(11, 'Research', 5),
+
+(12, 'Leadership', 5),
+(12, 'Communication', 5),
+(12, 'Problem Solving', 4),
+(12, 'Business Knowledge', 5);
+
+-- ============================================================
+-- CAREER SUBJECTS
+-- ============================================================
+INSERT INTO career_subjects (career_id, subject) VALUES
+(1, 'Computer Science'),
+(1, 'Mathematics'),
+(2, 'Mathematics'),
+(2, 'Statistics'),
+(2, 'Computer Science'),
+(3, 'Mathematics'),
+(3, 'Computer Science'),
+(3, 'Statistics'),
+(4, 'Mathematics'),
+(4, 'Statistics'),
+(4, 'Computer Science'),
+(5, 'Computer Science'),
+(5, 'Networking'),
+(6, 'Computer Science'),
+(6, 'Information Technology'),
+(7, 'Art'),
+(7, 'Computer Science'),
+(8, 'Business Studies'),
+(8, 'Mathematics'),
+(9, 'Computer Science'),
+(9, 'Networking'),
+(10, 'Computer Science'),
+(10, 'Database Management'),
+(11, 'Mathematics'),
+(11, 'Statistics'),
+(11, 'Computer Science'),
+(12, 'Business Studies'),
+(12, 'Communication');
+
+-- ============================================================
+-- COURSES
+-- ============================================================
+INSERT INTO courses (course_name, level, description) VALUES
+('B.Tech Computer Science and Engineering', 'Undergraduate',
+ 'Degree covering programming, algorithms, databases, operating systems and software engineering.'),
+
+('B.Sc Data Science', 'Undergraduate',
+ 'Degree focused on statistics, programming, data analysis and machine learning.'),
+
+('BCA', 'Undergraduate',
+ 'Computer applications degree covering programming, databases, web development and software.'),
+
+('MCA', 'Postgraduate',
+ 'Postgraduate program covering advanced computer applications, software development and databases.'),
+
+('M.Sc Data Science', 'Postgraduate',
+ 'Advanced program in statistics, data science, machine learning and analytics.'),
+
+('M.Tech Artificial Intelligence', 'Postgraduate',
+ 'Advanced study of artificial intelligence, machine learning and intelligent systems.'),
+
+('B.Tech Information Technology', 'Undergraduate',
+ 'Degree focused on information systems, software, networks and IT infrastructure.'),
+
+('B.Des User Experience Design', 'Undergraduate',
+ 'Design program focused on user experience, interfaces and interaction design.'),
+
+('MBA Business Analytics', 'Postgraduate',
+ 'Management program combining business strategy with analytics and data-driven decision making.'),
+
+('M.Tech Cybersecurity', 'Postgraduate',
+ 'Advanced program focused on information security, networks and cyber defense.');
+
+-- ============================================================
+-- CAREER <-> COURSE
+-- ============================================================
+INSERT INTO career_courses (career_id, course_id) VALUES
+(1, 1), (1, 3), (1, 4),
+(2, 2), (2, 4), (2, 5),
+(3, 1), (3, 4), (3, 6),
+(4, 2), (4, 3), (4, 4),
+(5, 1), (5, 7), (5, 10),
+(6, 1), (6, 3), (6, 7),
+(7, 8),
+(8, 9), (8, 4),
+(9, 1), (9, 7), (9, 4),
+(10, 1), (10, 4),
+(11, 5), (11, 6),
+(12, 9);
+
+-- ============================================================
+-- UNIVERSITIES
+-- ============================================================
+INSERT INTO universities (university_name, location, website) VALUES
+('Indian Institute of Science', 'Bengaluru, Karnataka',
+ 'https://iisc.ac.in'),
+
+('Indian Institute of Technology Bombay', 'Mumbai, Maharashtra',
+ 'https://www.iitb.ac.in'),
+
+('Indian Institute of Technology Delhi', 'New Delhi',
+ 'https://home.iitd.ac.in'),
+
+('Indian Institute of Technology Madras', 'Chennai, Tamil Nadu',
+ 'https://www.iitm.ac.in'),
+
+('National Institute of Technology Karnataka', 'Surathkal, Karnataka',
+ 'https://www.nitk.ac.in'),
+
+('University of Hyderabad', 'Hyderabad, Telangana',
+ 'https://uohyd.ac.in'),
+
+('Christ University', 'Bengaluru, Karnataka',
+ 'https://christuniversity.in'),
+
+('PES University', 'Bengaluru, Karnataka',
+ 'https://pes.edu'),
+
+('New Horizon College of Engineering', 'Bengaluru, Karnataka',
+ 'https://newhorizonindia.edu'),
+
+('Manipal Institute of Technology', 'Manipal, Karnataka',
+ 'https://manipal.edu/mit.html');
+
+-- ============================================================
+-- COURSE <-> UNIVERSITY
+-- ============================================================
+INSERT INTO course_universities (course_id, university_id) VALUES
+(1, 2), (1, 3), (1, 4), (1, 5),
+(2, 6), (2, 7),
+(3, 7), (3, 8), (3, 9),
+(4, 7), (4, 8), (4, 9), (4, 10),
+(5, 1), (5, 6),
+(6, 1), (6, 4),
+(7, 5), (7, 8),
+(8, 7),
+(9, 7),
+(10, 2), (10, 5);
+
+-- ============================================================
+-- SCHOLARSHIPS
+-- ============================================================
+INSERT INTO scholarships
+(scholarship_name, provider, description, eligibility, amount, application_url)
+VALUES
+('National Scholarship Portal Scholarships',
+ 'Government of India',
+ 'Central platform for multiple government scholarship schemes.',
+ 'Eligibility varies by scheme.',
+ 'Varies',
+ 'https://scholarships.gov.in/'),
+
+('AICTE Pragati Scholarship',
+ 'AICTE',
+ 'Scholarship support for eligible students in technical education.',
+ 'Eligibility depends on the current AICTE scheme rules.',
+ 'Varies',
+ 'https://www.aicte-india.org/'),
+
+('AICTE Saksham Scholarship',
+ 'AICTE',
+ 'Scholarship support for eligible students with disabilities in technical education.',
+ 'Eligibility depends on the current AICTE scheme rules.',
+ 'Varies',
+ 'https://www.aicte-india.org/'),
+
+('UGC Scholarships and Fellowships',
+ 'University Grants Commission',
+ 'Scholarship and fellowship opportunities for eligible higher education students.',
+ 'Eligibility varies by scheme.',
+ 'Varies',
+ 'https://www.ugc.gov.in/'),
+
+('Reliance Foundation Scholarship',
+ 'Reliance Foundation',
+ 'Higher education scholarship program for eligible students.',
+ 'Eligibility depends on the current program requirements.',
+ 'Varies',
+ 'https://www.reliancefoundation.org/');
+
+-- ============================================================
+-- CAREER <-> SCHOLARSHIP
+-- ============================================================
+INSERT INTO career_scholarships (career_id, scholarship_id) VALUES
+(1, 1), (1, 2), (1, 5),
+(2, 1), (2, 4), (2, 5),
+(3, 1), (3, 2), (3, 4),
+(4, 1), (4, 4),
+(5, 1), (5, 2),
+(6, 1), (6, 2),
+(7, 1), (7, 5),
+(8, 1), (8, 4),
+(9, 1), (9, 2),
+(10, 1), (10, 2),
+(11, 1), (11, 4),
+(12, 1), (12, 5);
+
+-- ============================================================
+-- SAMPLE CAREER RECOMMENDATIONS
+-- ============================================================
+INSERT INTO career_recommendations
+(student_id, career_id, suitability_score, explanation)
+VALUES
+(1, 1, 95.50,
+ 'Strong match due to programming, analytical thinking, problem solving and technology interests.'),
+
+(1, 2, 81.60,
+ 'Good match due to strong mathematics, statistics, analytical thinking and interest in data.'),
+
+(1, 7, 69.00,
+ 'Moderate match because of creativity and technology interests, but additional UI design skills are recommended.');
+
+-- ============================================================
+-- SAMPLE SKILL GAPS
+-- ============================================================
+INSERT INTO skill_gaps
+(student_id, career_id, skill_name, current_level, required_level, gap_value)
+VALUES
+(1, 1, 'Programming', 4, 5, 1),
+(1, 1, 'Problem Solving', 5, 5, 0),
+(1, 1, 'Analytical Thinking', 5, 4, 0),
+(1, 1, 'Communication', 3, 3, 0);
+
+-- ============================================================
+-- SAMPLE ROADMAP
+-- ============================================================
+INSERT INTO roadmap_steps
+(student_id, career_id, step_number, title, description, completed)
+VALUES
+(1, 1, 1, 'Strengthen Programming',
+ 'Practice Python/Java programming and object-oriented programming.',
+ TRUE),
+
+(1, 1, 2, 'Learn Data Structures',
+ 'Study arrays, linked lists, stacks, queues, trees, graphs and algorithms.',
+ FALSE),
+
+(1, 1, 3, 'Build Projects',
+ 'Create practical software projects and publish selected projects on GitHub.',
+ FALSE),
+
+(1, 1, 4, 'Learn Software Development',
+ 'Study databases, APIs, testing, version control and software engineering practices.',
+ FALSE),
+
+(1, 1, 5, 'Prepare for Interviews',
+ 'Practice coding problems, technical questions and project explanations.',
+ FALSE);
+
+-- ============================================================
+-- SAMPLE PROGRESS
+-- ============================================================
+INSERT INTO progress (student_id, roadmap_id, completed, completed_at)
+VALUES
+(1, 1, TRUE, CURRENT_TIMESTAMP),
+(1, 2, FALSE, NULL),
+(1, 3, FALSE, NULL),
+(1, 4, FALSE, NULL),
+(1, 5, FALSE, NULL);
+
+-- ============================================================
+-- SAMPLE AI MENTOR CHAT
+-- ============================================================
+INSERT INTO mentor_chat (student_id, sender, message) VALUES
+(1, 'student', 'What skills should I improve to become a software engineer?'),
+(1, 'ai', 'Focus on programming, data structures and algorithms, databases, problem solving and software development projects.');
+
+-- ============================================================
+-- VERIFICATION QUERIES
+-- ============================================================
+SELECT 'Database created successfully' AS status;
+
+SHOW TABLES;
+
+SELECT * FROM students;
+SELECT * FROM careers;
+SELECT * FROM courses;
+SELECT * FROM universities;
+SELECT * FROM scholarships;
+
+-- Top career recommendations for a student
+SELECT
+    s.name,
+    c.career_name,
+    cr.suitability_score,
+    cr.explanation
+FROM career_recommendations cr
+JOIN students s ON cr.student_id = s.student_id
+JOIN careers c ON cr.career_id = c.career_id
+WHERE s.student_id = 1
+ORDER BY cr.suitability_score DESC;
+
+-- Roadmap progress
+SELECT
+    rs.step_number,
+    rs.title,
+    rs.completed
+FROM roadmap_steps rs
+WHERE rs.student_id = 1
+ORDER BY rs.step_number;
