@@ -193,7 +193,12 @@ Include an entry in "explanations" for every career listed above. Keep the roadm
         }
 
 
-def generate_chat_reply(student_profile: dict, message: str) -> str:
+def generate_chat_reply(student_profile: dict, message: str, history: list[dict] | None = None) -> str:
+    history_block = ""
+    if history:
+        turns = "\n".join(f"{h['sender']}: {h['message']}" for h in history[-6:])
+        history_block = f"\nRecent conversation so far:\n{turns}\n"
+
     prompt = f"""You are a warm, encouraging career mentor AI for a student career guidance app.
 
 Student profile:
@@ -201,7 +206,7 @@ Student profile:
 - Hobbies: {student_profile.get('hobbies')}
 - Academic strengths: {student_profile.get('academics')}
 - Self-rated skills: {student_profile.get('self_rated_skills')}
-
+{history_block}
 The student asks: "{message}"
 
 Give a helpful, specific, encouraging answer in 3-5 sentences. Reference their actual profile

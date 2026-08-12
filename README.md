@@ -42,3 +42,4 @@ Runs at http://localhost:5173.
 - [`docs/02b_DATA_MODEL.md`](docs/02b_DATA_MODEL.md) — database schema
 - [`docs/03_SCORING_ALGORITHM.md`](docs/03_SCORING_ALGORITHM.md) — how career matching works
 - [`docs/04_API_SPEC.md`](docs/04_API_SPEC.md) — API endpoints
+- [`docs/05_IMPLEMENTATION.md`](docs/05_IMPLEMENTATION.md) — as-built system: MySQL data model, end-to-end request flow, known gaps

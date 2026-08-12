@@ -1,85 +1,75 @@
 # Data Model
 
+**Implemented as MySQL** (`backend/database/schema.sql`, applied automatically
+on startup by `app/services/db.py:init_db`) — 4 tables. `students` and
+`careers` use JSON columns for list/dict fields (denormalized, per the
+"Notes on scale" below) rather than the fully-normalized junction tables
+originally sketched here; `mentor_chat` and `roadmap_steps` back the two
+stateful features (chat history, roadmap progress tracking).
+
 ## `students`
 | Column | Type | Notes |
 |---|---|---|
-| id | uuid, PK | |
-| name | text | |
-| email | text | unique |
-| created_at | timestamp | |
-
-## `student_profiles`
-| Column | Type | Notes |
-|---|---|---|
-| id | uuid, PK | |
-| student_id | uuid, FK → students | |
-| interests | text[] | multi-select tags, e.g. `["technology", "design"]` |
-| hobbies | text[] | |
-| riasec_scores | jsonb | `{"R": 3, "I": 8, "A": 5, "S": 2, "E": 4, "C": 6}` — computed from quiz |
-| academics | jsonb | `{"Math": 85, "Physics": 78, "English": 65, ...}` |
-| self_rated_skills | jsonb | `{"communication": 4, "coding": 5, "leadership": 2}` (1-5 scale) |
-| created_at | timestamp | |
+| student_id | INT, PK, AUTO_INCREMENT | |
+| name | VARCHAR(150) | |
+| interests | JSON | `["technology", "design"]` |
+| hobbies | JSON | `["reading", "coding"]` |
+| riasec_scores | JSON | `{"R": 3, "I": 8, "A": 5, "S": 2, "E": 4, "C": 6}` — computed server-side from quiz answers |
+| academics | JSON | `{"Math": 85, "Physics": 78, "English": 65}` |
+| self_rated_skills | JSON | `{"communication": 4, "coding": 5}` (1-5 scale) |
+| created_at | TIMESTAMP | |
 
 ## `careers`
 | Column | Type | Notes |
 |---|---|---|
-| id | uuid, PK | |
-| name | text | e.g. "Data Scientist" |
-| description | text | 1-2 sentence overview |
-| riasec_tags | jsonb | `{"R": 2, "I": 9, "A": 3, "S": 2, "E": 5, "C": 6}` — ideal profile for this career |
-| relevant_subjects | text[] | `["Math", "Computer Science", "Statistics"]` |
-| required_skills | text[] | `["Python", "Statistics", "Communication"]` |
-| emerging | boolean | flag for "emerging career" badge in UI |
+| id | VARCHAR(50), PK | slug, e.g. `"data-scientist"` |
+| name | VARCHAR(150) | e.g. "Data Scientist" |
+| description | TEXT | 1-2 sentence overview |
+| riasec_tags | JSON | `{"R": 2, "I": 9, "A": 3, "S": 2, "E": 5, "C": 6}` — ideal profile for this career |
+| relevant_subjects | JSON | `["Math", "Computer Science", "Statistics"]` |
+| required_skills | JSON | `["Python", "Statistics", "Communication"]` |
+| interest_tags | JSON | `["technology", "problem-solving"]` |
+| courses | JSON | `[{"name": "B.Sc Statistics", "level": "undergrad"}]` |
+| colleges | JSON | `[{"name": "IIT Bombay", "location": "Mumbai"}]` |
+| scholarships | JSON | `[{"name": "...", "eligibility": "...", "link": "..."}]` |
+| certifications | JSON | `[{"name": "...", "provider": "Coursera"}]` |
+| emerging | BOOLEAN | flag for "emerging career" badge in UI |
 
-## `courses`
+`app/data/careers_seed.json` is the source of truth for this table — it's
+auto-seeded on first startup (empty table check), so editing the JSON file
+and clearing the table is how you add/update careers.
+
+## `mentor_chat`
 | Column | Type | Notes |
 |---|---|---|
-| id | uuid, PK | |
-| career_id | uuid, FK → careers | |
-| name | text | e.g. "B.Tech Computer Science" |
-| level | text | undergrad / postgrad / certification |
+| message_id | INT, PK, AUTO_INCREMENT | |
+| student_id | INT, FK → students | `ON DELETE CASCADE` |
+| sender | ENUM('student', 'ai') | |
+| message | TEXT | |
+| created_at | TIMESTAMP | |
 
-## `colleges`
+Full conversation history for `/mentor/chat`; the last 6 turns are fed back
+into the LLM prompt as context on each new message.
+
+## `roadmap_steps`
 | Column | Type | Notes |
 |---|---|---|
-| id | uuid, PK | |
-| course_id | uuid, FK → courses | |
-| name | text | |
-| location | text | |
-| notes | text | e.g. ranking, fees range — keep static/curated |
+| step_id | INT, PK, AUTO_INCREMENT | |
+| student_id | INT, FK → students | `ON DELETE CASCADE` |
+| career | VARCHAR(150) | career name the roadmap is for (not a FK — matches `careers.name`, not `careers.id`) |
+| step_number | INT | 1-indexed order |
+| description | TEXT | e.g. "Step 1: Strengthen your foundation in..." |
+| completed | BOOLEAN | toggled via `PATCH /roadmap/{student_id}/steps/{step_id}` |
+| created_at | TIMESTAMP | |
 
-## `scholarships`
-| Column | Type | Notes |
-|---|---|---|
-| id | uuid, PK | |
-| career_id | uuid, FK → careers (nullable) | can be general or career-specific |
-| name | text | |
-| eligibility | text | short description |
-| link | text | official info link |
-
-## `certifications`
-| Column | Type | Notes |
-|---|---|---|
-| id | uuid, PK | |
-| career_id | uuid, FK → careers | |
-| name | text | e.g. "Google Data Analytics Certificate" |
-| provider | text | e.g. Coursera, edX |
+Populated by `POST /score/insights` for the top-matched career; each call
+replaces the prior roadmap for that student+career pair rather than
+accumulating duplicates.
 
 ## Notes on scale
-For a 1-week expo build, `courses`, `colleges`, `scholarships`, `certifications` can live as **nested JSON inside the `careers` row** instead of separate tables — much faster to seed and query for ~30 careers, and still fine to describe as "relational design, denormalized for this dataset size" if asked. Use real separate tables only if the team has time to spare after Day 5.
+For a 1-week expo build, `courses`, `colleges`, `scholarships`,
+`certifications` live as **nested JSON inside the `careers` row** instead of
+separate tables — much faster to seed and query for ~30 careers, and still
+fine to describe as "relational design, denormalized for this dataset size"
+if asked.
 
-Example denormalized `careers` row:
-```json
-{
-  "name": "Data Scientist",
-  "description": "Analyzes data to drive business and research decisions.",
-  "riasec_tags": {"R": 2, "I": 9, "A": 3, "S": 2, "E": 5, "C": 6},
-  "relevant_subjects": ["Math", "Computer Science", "Statistics"],
-  "required_skills": ["Python", "Statistics", "Machine Learning", "Communication"],
-  "courses": [{"name": "B.Sc Statistics", "level": "undergrad"}, {"name": "B.Tech CSE", "level": "undergrad"}],
-  "colleges": [{"name": "IIT Bombay", "location": "Mumbai"}],
-  "scholarships": [{"name": "AICTE Pragati Scholarship", "eligibility": "Girl students in technical courses"}],
-  "certifications": [{"name": "Google Data Analytics Certificate", "provider": "Coursera"}],
-  "emerging": true
-}
-```

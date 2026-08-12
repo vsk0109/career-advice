@@ -14,6 +14,7 @@ def create_profile(payload: ProfileIntake):
 
     profile_data = {
         "name": payload.name,
+        "email": payload.email,
         "interests": payload.interests,
         "hobbies": payload.hobbies,
         "academics": payload.academics,

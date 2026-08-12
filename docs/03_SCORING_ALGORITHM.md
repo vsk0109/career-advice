@@ -2,6 +2,26 @@
 
 This is the deterministic, explainable "AI" core. It's a weighted matching algorithm, not a trained model — that's a legitimate and honest design choice for a 1-week build, and it's easy to explain and defend to judges.
 
+## Background — the RIASEC model
+
+RIASEC (aka the Holland Code) is a career-psychology model (John Holland,
+1950s-70s): people's occupational interests cluster into six orientations.
+Each letter describes an interest/personality type, not a skill level, and
+most people (and careers) are a blend of 2-3 dimensions rather than one pure
+type:
+
+- **R**ealistic — hands-on, mechanical, outdoors → trades, engineering, physical work
+- **I**nvestigative — analytical, scientific, curious → research, data, medicine
+- **A**rtistic — creative, expressive, unstructured → design, writing, music
+- **S**ocial — helping, teaching, communicating → counseling, education, healthcare
+- **E**nterprising — leading, persuading, risk-taking → business, sales, entrepreneurship
+- **C**onventional — organized, detail-oriented, rule-following → admin, accounting, data entry
+
+This app collects it via 12 fixed Likert-scale (1-5) statements — 2 per
+dimension, defined in `backend/app/data/riasec_questions.py` — and matches
+`riasec_answers[i]` to the question at that same index, so the answers array
+and the question list must stay in the same order.
+
 ## Step 1 — RIASEC Personality Score
 
 Use a simplified Holland Code (RIASEC) quiz: 12-18 short statements ("I enjoy fixing or building things", "I like analyzing data and solving puzzles", "I enjoy creative writing or art", etc.), each tagged to one of six dimensions:
@@ -17,7 +37,7 @@ Each statement rated 1-5 (Likert scale). Sum ratings per dimension → normalize
 
 Each career in the dataset has an equivalent `career_riasec` profile (assign these manually during data curation, based on how the career is generally understood — e.g., Software Engineer skews I/C, Graphic Designer skews A/E).
 
-**RIASEC match score** = cosine similarity or simple normalized distance between `student_riasec` and `career_riasec` vectors, scaled to 0-100.
+**RIASEC match score** = cosine similarity or simple normalized distance between `student_riasec` and `career_riasec` vectors, scaled to 0-100. Cosine similarity (not raw distance) measures the *angle* between the two vectors — whether the student's shape of interests points in the same direction as the career's — rather than penalizing someone who simply rated every dimension more intensely.
 
 ```python
 def riasec_match(student_vec: dict, career_vec: dict) -> float:
