@@ -23,6 +23,33 @@ class AuthResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ForgotPasswordResponse(BaseModel):
+    detail: str
+    # No email sending is wired up yet, so the raw reset token is returned
+    # directly here rather than emailed — see docs/05_IMPLEMENTATION.md's
+    # known gaps. None if the email doesn't match an account (avoids leaking
+    # which emails are registered).
+    reset_token: Optional[str] = None
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+class MessageResponse(BaseModel):
+    detail: str
+
+
 # ---------- Profile ----------
 
 class ProfileIntake(BaseModel):

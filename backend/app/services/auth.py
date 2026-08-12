@@ -4,7 +4,9 @@ Password hashing and JWT issuing/verification for /auth/signup and
 to identify the caller — no endpoint accepts student_id from the client.
 """
 
+import hashlib
 import os
+import secrets
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
@@ -17,6 +19,7 @@ load_dotenv()
 JWT_SECRET = os.getenv("JWT_SECRET", "")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "1440"))
+RESET_TOKEN_EXPIRE_MINUTES = 30
 
 
 def hash_password(password: str) -> str:
@@ -25,6 +28,21 @@ def hash_password(password: str) -> str:
 
 def verify_password(password: str, password_hash: str) -> bool:
     return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
+
+
+def generate_reset_token() -> tuple[str, str, datetime]:
+    """Returns (raw_token, token_hash, expires_at). The raw token is what
+    gets sent back to the requester; only its hash is stored in the DB —
+    same principle as password_hash, so a DB leak alone can't be used to
+    reset accounts."""
+    raw_token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_EXPIRE_MINUTES)
+    return raw_token, token_hash, expires_at
+
+
+def hash_reset_token(raw_token: str) -> str:
+    return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
 
 
 def create_access_token(student_id: str) -> str:

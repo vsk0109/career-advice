@@ -44,6 +44,64 @@ Creates a student account with an empty profile (filled in later via
 
 ---
 
+### `POST /auth/change-password`
+For a logged-in student who knows their current password. Auth required.
+
+**Request body:**
+```json
+{ "current_password": "...", "new_password": "at least 8 chars" }
+```
+
+**Response:**
+```json
+{ "detail": "Password changed successfully." }
+```
+`401` if `current_password` is wrong.
+
+---
+
+### `POST /auth/forgot-password`
+For a student who can't log in. No auth required (that's the point).
+Returns the same response whether or not the email is registered, so this
+endpoint can't be used to discover which emails have accounts.
+
+**⚠️ No email sending is wired up.** The raw reset token is returned
+directly in the response body rather than emailed. Fine for local/demo
+use; before any real deployment, swap this for actually emailing the
+token to the address on file so only the account owner receives it — see
+`05_IMPLEMENTATION.md`'s known gaps.
+
+**Request body:**
+```json
+{ "email": "vaishnavi@example.com" }
+```
+
+**Response (email registered):**
+```json
+{ "detail": "If that email is registered, a reset token has been issued.", "reset_token": "xluXQQjuFsq3zohh..." }
+```
+
+**Response (email not registered):** same `detail`, `reset_token: null`.
+
+---
+
+### `POST /auth/reset-password`
+Completes the forgot-password flow. No auth required — the token itself is
+the proof of identity. Single-use; expires 30 minutes after being issued.
+
+**Request body:**
+```json
+{ "token": "xluXQQjuFsq3zohh...", "new_password": "at least 8 chars" }
+```
+
+**Response:**
+```json
+{ "detail": "Password has been reset. You can now log in with your new password." }
+```
+`400` if the token is invalid, expired, or already used.
+
+---
+
 ### `POST /profile`
 Save the authenticated student's intake data (RIASEC answers, academics,
 interests, hobbies, skills). Overwrites any previously saved intake.

@@ -47,6 +47,24 @@ def login(email: str, password: str) -> dict:
     return _handle(resp)
 
 
+def change_password(current_password: str, new_password: str) -> dict:
+    return _handle(requests.post(
+        f"{API_BASE_URL}/auth/change-password",
+        json={"current_password": current_password, "new_password": new_password},
+        headers=_auth_headers(),
+    ))
+
+
+def forgot_password(email: str) -> dict:
+    return _handle(requests.post(f"{API_BASE_URL}/auth/forgot-password", json={"email": email}))
+
+
+def reset_password(token: str, new_password: str) -> dict:
+    return _handle(requests.post(
+        f"{API_BASE_URL}/auth/reset-password", json={"token": token, "new_password": new_password}
+    ))
+
+
 def get_profile() -> dict:
     return _handle(requests.get(f"{API_BASE_URL}/profile", headers=_auth_headers()))
 

@@ -29,31 +29,56 @@ EXISTS`, safe to re-run):
 
 | Table | Purpose | Key columns |
 |---|---|---|
-| `students` | One row per student, created at signup | `email`, `password_hash` (bcrypt); `interests`, `hobbies`, `riasec_scores`, `academics`, `self_rated_skills` — all JSON, start empty |
+| `students` | One row per student, created at signup | `email`, `password_hash` (bcrypt); `interests`, `hobbies`, `riasec_answers`, `riasec_scores`, `academics`, `self_rated_skills` — all JSON, start empty |
 | `careers` | One row per career, seeded from `careers_seed.json` | `riasec_tags`, `courses`, `colleges`, `scholarships`, `certifications` — all JSON; `emerging` boolean |
 | `mentor_chat` | Full chat history | `student_id` FK, `sender` (`student`/`ai`), `message`, `created_at` |
 | `roadmap_steps` | Roadmap progress tracking | `student_id` FK, `career`, `step_number`, `description`, `completed` |
+| `insights` | Cached last AI insights per student | `student_id` PK/FK, `top_career`, `explanations`, `emerging_trend` |
+| `password_resets` | Forgot-password tokens | `student_id` FK, `token_hash` (sha256, never the raw token), `expires_at`, `used` |
 
 Full column-level detail: `02b_DATA_MODEL.md`.
 
 `app/services/db.py` is the *only* module that imports `pymysql`. Routers
 and `scoring_engine.py` only ever call its plain-dict functions
-(`create_account`, `get_student_auth_by_email`, `update_profile`,
-`get_profile`, `get_all_careers`, `save_chat_message`, `get_chat_history`,
-`save_roadmap`, `get_roadmap`, `update_roadmap_step`) — the storage layer
-could change again without touching either.
+(`create_account`, `get_student_auth_by_email`, `get_student_auth_by_id`,
+`update_password_hash`, `create_password_reset`, `get_valid_password_reset`,
+`mark_password_reset_used`, `update_profile`, `get_profile`,
+`get_all_careers`, `save_chat_message`, `get_chat_history`, `save_roadmap`,
+`get_roadmap`, `update_roadmap_step`, `save_insights`, `get_insights`) —
+the storage layer could change again without touching either.
 
 ## Auth
 
-`app/services/auth.py` handles password hashing (bcrypt) and JWT
-issuing/verification (PyJWT, HS256, secret from `JWT_SECRET`). Every
-protected route depends on `get_current_student_id` — a FastAPI dependency
-that reads the `Authorization: Bearer <token>` header, decodes it, and
-returns the student_id from the token's `sub` claim (401 if missing,
-malformed, or expired). No endpoint accepts `student_id` from the client —
-identity comes entirely from the token, which is also why `/profile`,
-`/score`, `/mentor/chat`, and `/roadmap` dropped `student_id` from their
-request bodies/paths compared to earlier versions of this API.
+`app/services/auth.py` handles password hashing (bcrypt), JWT
+issuing/verification (PyJWT, HS256, secret from `JWT_SECRET`), and
+password-reset tokens. Every protected route depends on
+`get_current_student_id` — a FastAPI dependency that reads the
+`Authorization: Bearer <token>` header, decodes it, and returns the
+student_id from the token's `sub` claim (401 if missing, malformed, or
+expired). No endpoint accepts `student_id` from the client — identity
+comes entirely from the token, which is also why `/profile`, `/score`,
+`/mentor/chat`, and `/roadmap` dropped `student_id` from their request
+bodies/paths compared to earlier versions of this API.
+
+**Password change/reset** (`routers/auth.py`):
+- `POST /auth/change-password` — authenticated; verifies `current_password`
+  against the stored hash before allowing `new_password`.
+- `POST /auth/forgot-password` — unauthenticated by design (that's the
+  point — the caller can't log in). Generates a random token
+  (`secrets.token_urlsafe(32)`), stores only its sha256 hash in
+  `password_resets`, and returns the *raw* token in the response. Always
+  returns the same `detail` message whether or not the email is
+  registered, so it can't be used to enumerate accounts.
+- `POST /auth/reset-password` — hashes the submitted token, looks it up,
+  checks `used = FALSE AND expires_at > UTC_TIMESTAMP()`, updates the
+  password, and marks the token used (single-use).
+- **Known limitation:** no email sending is wired up, so the reset token
+  is returned directly in the API response instead of emailed. That's
+  fine for local/demo use but means anyone who can call the API and knows
+  an email can reset that account's password — the security property a
+  real forgot-password flow relies on (only the inbox owner sees the
+  token) doesn't hold yet. Wire in an actual email step before deploying
+  this publicly.
 
 ## End-to-end request flow
 
@@ -152,16 +177,16 @@ Requires a running local MySQL server. `init_db()` on startup:
 1. `CREATE DATABASE IF NOT EXISTS` the configured database name.
 2. Runs every `CREATE TABLE IF NOT EXISTS` in `schema.sql`.
 3. If `careers` is empty, seeds it from `app/data/careers_seed.json`.
-4. Migrates `students` to add `email`/`password_hash` if the table predates them.
+4. Migrates `students` to add `email`/`password_hash`/`riasec_answers` if the table predates them.
 
 No manual migration step, no seed script to remember to run.
 
 ## Known gaps / next steps
 
-- `/score` and `/score/insights` results aren't cached — every dashboard
-  load recomputes the ranking and, if called, re-hits the LLM. Fine at
-  demo scale; would want a `career_recommendations`-style cache table if
-  this became a real product with repeat visits.
+- `/score` isn't cached — every dashboard load recomputes the ranking.
+  It's fast and deterministic (no LLM call), so this is cheap; AI insights
+  *are* cached (see the `insights` table above) since those involve the
+  slow/costly LLM call.
 - `roadmap` is keyed by career **name** (`careers.name`), not `careers.id`
   — if a career gets renamed in `careers_seed.json`, existing roadmap rows
   for it become orphaned from the new row. Not an issue at current scale
@@ -171,6 +196,9 @@ No manual migration step, no seed script to remember to run.
   24h) — there's no server-side session/blocklist, so "logout" only clears
   the token client-side. Acceptable for a demo; a real deployment would
   want short-lived access tokens + refresh tokens, or a revocation list.
+- Forgot-password has no email sending wired up — the reset token is
+  returned directly in the API response (see the Auth section above).
+  Needs a real email step before any public deployment.
 - `careers.riasec_tags` are hand-assigned during data curation (see
   `03_SCORING_ALGORITHM.md`), not derived from labor-market data — a
   reasonable simplification for a curated ~30-career dataset, but worth

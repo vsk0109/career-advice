@@ -155,7 +155,7 @@ def render_auth() -> None:
             unsafe_allow_html=True,
         )
 
-        login_tab, signup_tab = st.tabs(["Log in", "Sign up"])
+        login_tab, signup_tab, forgot_tab = st.tabs(["Log in", "Sign up", "Forgot password?"])
 
         with login_tab:
             with st.form("login_form"):
@@ -190,6 +190,46 @@ def render_auth() -> None:
                         result = api.signup(name, email, password)
                         _apply_auth_result(result)
                         st.rerun()
+                    except api.APIError as e:
+                        st.error(e.detail)
+
+        with forgot_tab:
+            st.markdown(
+                "<p class='muted'>Email delivery isn't wired up yet, so the reset link is shown "
+                "directly below instead of being emailed — for local/demo use only.</p>",
+                unsafe_allow_html=True,
+            )
+            with st.form("forgot_form"):
+                forgot_email = st.text_input("Email", placeholder="you@example.com", key="forgot_email")
+                requested = st.form_submit_button("Request reset token →", use_container_width=True)
+            if requested:
+                if not forgot_email:
+                    st.warning("Enter your email.")
+                else:
+                    try:
+                        result = api.forgot_password(forgot_email)
+                        if result.get("reset_token"):
+                            st.success("Reset token generated — copy it below (valid for 30 minutes).")
+                            st.code(result["reset_token"])
+                        else:
+                            st.info(result["detail"])
+                    except api.APIError as e:
+                        st.error(e.detail)
+
+            with st.form("reset_form"):
+                reset_token = st.text_input("Reset token", key="reset_token_input")
+                new_password = st.text_input("New password", type="password", key="reset_new_password",
+                                              help="Minimum 8 characters")
+                reset_submitted = st.form_submit_button("Reset password →", use_container_width=True)
+            if reset_submitted:
+                if not reset_token or not new_password:
+                    st.warning("Enter both the reset token and a new password.")
+                elif len(new_password) < 8:
+                    st.warning("Password must be at least 8 characters.")
+                else:
+                    try:
+                        result = api.reset_password(reset_token, new_password)
+                        st.success(result["detail"])
                     except api.APIError as e:
                         st.error(e.detail)
 
@@ -449,6 +489,25 @@ def render_sidebar() -> str:
         st.markdown("---")
         st.markdown(f"<p class='muted'>Signed in as</p><h3 style='margin-top:-8px'>{escape(st.session_state.name)}</h3>",
                      unsafe_allow_html=True)
+
+        with st.expander("Change password"):
+            with st.form("change_password_form"):
+                current_password = st.text_input("Current password", type="password", key="current_password")
+                new_password = st.text_input("New password", type="password", key="new_password_input",
+                                              help="Minimum 8 characters")
+                change_submitted = st.form_submit_button("Update password", use_container_width=True)
+            if change_submitted:
+                if not current_password or not new_password:
+                    st.warning("Fill in both fields.")
+                elif len(new_password) < 8:
+                    st.warning("New password must be at least 8 characters.")
+                else:
+                    try:
+                        result = api.change_password(current_password, new_password)
+                        st.success(result["detail"])
+                    except api.APIError as e:
+                        st.error(e.detail)
+
         if st.button("Log out", use_container_width=True):
             logout()
     return selected_page

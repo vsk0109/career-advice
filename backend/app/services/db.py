@@ -160,6 +160,62 @@ def get_student_auth_by_email(email: str) -> dict | None:
         return cur.fetchone()
 
 
+def get_student_auth_by_id(student_id: str) -> dict | None:
+    """Returns {student_id, name, email, password_hash} for the authenticated
+    caller — used by change-password to verify the current password."""
+    numeric_id = _to_int(student_id)
+    if numeric_id is None:
+        return None
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT student_id, name, email, password_hash FROM students WHERE student_id = %s",
+            (numeric_id,),
+        )
+        return cur.fetchone()
+
+
+def update_password_hash(student_id: str, password_hash: str) -> None:
+    numeric_id = _to_int(student_id)
+    if numeric_id is None:
+        return
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            "UPDATE students SET password_hash = %s WHERE student_id = %s",
+            (password_hash, numeric_id),
+        )
+
+
+# ---- password reset ----
+
+def create_password_reset(student_id: str, token_hash: str, expires_at) -> None:
+    numeric_id = _to_int(student_id)
+    if numeric_id is None:
+        return
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO password_resets (student_id, token_hash, expires_at) VALUES (%s, %s, %s)",
+            (numeric_id, token_hash, expires_at),
+        )
+
+
+def get_valid_password_reset(token_hash: str) -> dict | None:
+    """Returns {reset_id, student_id} if token_hash is unused and unexpired, else None."""
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT reset_id, student_id FROM password_resets
+            WHERE token_hash = %s AND used = FALSE AND expires_at > UTC_TIMESTAMP()
+            """,
+            (token_hash,),
+        )
+        return cur.fetchone()
+
+
+def mark_password_reset_used(reset_id: int) -> None:
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute("UPDATE password_resets SET used = TRUE WHERE reset_id = %s", (reset_id,))
+
+
 def update_profile(student_id: str, profile_fields: dict) -> None:
     """Overwrites the intake fields for an existing student (created at signup)."""
     numeric_id = _to_int(student_id)
