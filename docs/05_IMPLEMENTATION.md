@@ -129,3 +129,7 @@ No manual migration step, no seed script to remember to run.
   knows a valid ID can read/modify that student's profile, chat, and
   roadmap. Acceptable for a local/demo build; would need real auth before
   any public deployment.
+- `careers.riasec_tags` are hand-assigned during data curation (see
+  `03_SCORING_ALGORITHM.md`), not derived from labor-market data — a
+  reasonable simplification for a curated ~30-career dataset, but worth
+  flagging if asked where the "ideal profile" per career comes from.
