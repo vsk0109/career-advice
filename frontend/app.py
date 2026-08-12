@@ -7,16 +7,54 @@ Mentor Question Bank. Answers stay only in this Streamlit browser session.
 from __future__ import annotations
 
 from html import escape
+import json
+import os
 import random
+import re
+from pathlib import Path
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 import streamlit as st
 
 
-LOGO_PATH = "assets/career-ai-logo-cropped.png"
+# Transparent butterfly logo: it blends into the page instead of appearing
+# as a screenshot with a dark square behind it.
+LOGO_PATH = str(Path(__file__).parent / "assets" / "career-ai-logo-clean.png")
+JOB_CATALOG_PATH = Path(__file__).parent / "data" / "all_jobs.txt"
+UNIVERSITY_DATA_PATH = Path(__file__).parent / "data" / "universities_scholarships.txt"
+# Change this if your FastAPI server uses a different host, port, or route.
+# You can also set PROFILE_API_URL in your terminal or Streamlit secrets.
+DEFAULT_PROFILE_API_URL = "http://127.0.0.1:8000/profile"
+DEFAULT_CAREERS_API_URL = "http://127.0.0.1:8000/careers"
+DEFAULT_CHAT_API_URL = "http://127.0.0.1:8000/mentor/chat"
+DEFAULT_ROADMAP_API_URL = "http://127.0.0.1:8000/roadmap"
+DEFAULT_SCORE_API_URL = "http://127.0.0.1:8000/score"
+DEFAULT_AUTH_API_URL = "http://127.0.0.1:8000/auth"
 st.set_page_config(page_title="Career AI", page_icon=LOGO_PATH, layout="wide", initial_sidebar_state="expanded")
 
-PAGES = ("Dashboard", "Explore Careers", "Skill Roadmap", "Scholarships", "Universities", "Profile", "AI Mentor")
-PAGE_ICONS = {"Dashboard": "⌂", "Explore Careers": "⌕", "Skill Roadmap": "↗", "Scholarships": "✦", "Universities": "♜", "Profile": "♙", "AI Mentor": "✧"}
+PAGES = ("Dashboard", "Explore Careers", "Skill Roadmap", "Scholarships", "Universities", "AI Mentor")
+PAGE_ICONS = {"Dashboard": "⌂", "Explore Careers": "⌕", "Skill Roadmap": "↗", "Scholarships": "✦", "Universities": "♜", "AI Mentor": "✧"}
+GLOBAL_UNIVERSITY_COUNTRIES = (
+    "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia", "Australia", "Austria",
+    "Azerbaijan", "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan", "Bolivia",
+    "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria", "Burkina Faso", "Burundi", "Cambodia", "Cameroon", "Canada",
+    "Cape Verde", "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros", "Congo", "Costa Rica", "Croatia", "Cuba",
+    "Cyprus", "Czech Republic", "Denmark", "Djibouti", "Dominica", "Dominican Republic", "Ecuador", "Egypt", "El Salvador", "Estonia",
+    "Eswatini", "Ethiopia", "Fiji", "Finland", "France", "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece", "Grenada",
+    "Guatemala", "Guinea", "Guyana", "Haiti", "Honduras", "Hong Kong", "Hungary", "Iceland", "India", "Indonesia", "Iran", "Iraq",
+    "Ireland", "Israel", "Italy", "Jamaica", "Japan", "Jordan", "Kazakhstan", "Kenya", "Kuwait", "Kyrgyzstan", "Laos", "Latvia",
+    "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg", "Madagascar", "Malawi", "Malaysia", "Maldives",
+    "Mali", "Malta", "Mauritius", "Mexico", "Moldova", "Monaco", "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar", "Namibia",
+    "Nepal", "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria", "North Korea", "North Macedonia", "Norway", "Oman", "Pakistan",
+    "Palestine", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland", "Portugal", "Qatar", "Romania", "Russia",
+    "Rwanda", "Saint Kitts and Nevis", "Saint Lucia", "Saint Vincent and the Grenadines", "Saudi Arabia", "Senegal", "Serbia", "Seychelles",
+    "Sierra Leone", "Singapore", "Slovakia", "Slovenia", "Somalia", "South Africa", "South Korea", "Spain", "Sri Lanka", "Sudan", "Suriname",
+    "Sweden", "Switzerland", "Syria", "Taiwan", "Tajikistan", "Tanzania", "Thailand", "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago",
+    "Tunisia", "Turkey", "Turkmenistan", "Uganda", "Ukraine", "United Arab Emirates", "United Kingdom", "United States", "Uruguay", "Uzbekistan",
+    "Vanuatu", "Venezuela", "Vietnam", "Yemen", "Zambia", "Zimbabwe",
+)
 QUOTES = (
     "The future depends on what you do today.",
     "Choose a path that lets your strengths grow.",
@@ -157,15 +195,146 @@ SHORT_RIASEC_QUESTIONS = tuple(
     for code, (_, _, statements) in RIASEC.items()
     for statement in statements[:2]
 )
+# These IDs must match the keys in the backend QUESTION_DIMENSIONS dictionary.
+# Example: QUESTION_DIMENSIONS = {"q1": "R", "q2": "R", ..., "q60": "C"}.
+# The quick quiz keeps the IDs from the complete 60-question bank.
+BACKEND_QUESTION_ID_BY_STATEMENT = {
+    statement: f"q{index + 1}" for index, (_, statement) in enumerate(RIASEC_QUESTIONS)
+}
 
 CAREER_MAP = {
-    "R": ("Mechanical Engineer", "Architect", "Environmental Scientist"), "I": ("Data Scientist", "Software Engineer", "Physician"),
-    "A": ("UX Designer", "Writer", "Animator"), "S": ("Psychologist", "Teacher", "Healthcare Professional"),
-    "E": ("Entrepreneur", "Product Manager", "Lawyer"), "C": ("Data Analyst", "Accountant", "Operations Manager"),
-    "RI": ("Robotics Engineer", "Cybersecurity Analyst", "Environmental Scientist"), "IA": ("UX Researcher", "Product Designer", "Science Journalist"),
-    "AS": ("Art Therapist", "Communications Specialist", "Teacher"), "SE": ("HR Manager", "Corporate Trainer", "Nonprofit Director"),
-    "EC": ("Financial Manager", "Supply Chain Manager", "Business Analyst"), "CI": ("Actuarial Analyst", "Statistician", "Risk Analyst"),
+    "R": ("Mechanical Engineer", "Civil Engineer", "Architect", "Environmental Scientist", "Automotive Engineer", "Pilot", "Industrial Designer", "Forensic Scientist"),
+    "I": ("Data Scientist", "Software Engineer", "Physician", "Biotechnologist", "Research Scientist", "Cybersecurity Analyst", "Economist", "Clinical Researcher"),
+    "A": ("UX Designer", "Writer", "Animator", "Graphic Designer", "Film Maker", "Fashion Designer", "Game Designer", "Content Strategist"),
+    "S": ("Psychologist", "Teacher", "Healthcare Professional", "Counsellor", "Social Worker", "Nurse", "Speech Therapist", "Education Consultant"),
+    "E": ("Entrepreneur", "Product Manager", "Lawyer", "Marketing Manager", "Management Consultant", "Sales Manager", "Public Relations Specialist", "Business Development Manager"),
+    "C": ("Data Analyst", "Accountant", "Operations Manager", "Financial Analyst", "Actuarial Analyst", "Supply Chain Manager", "Project Coordinator", "Compliance Officer"),
+    "RI": ("Robotics Engineer", "Aerospace Engineer", "Environmental Scientist", "Biomedical Engineer", "Cybersecurity Analyst"),
+    "IA": ("UX Researcher", "Product Designer", "Science Journalist", "Human-Computer Interaction Researcher", "Data Visualisation Specialist"),
+    "AS": ("Art Therapist", "Communications Specialist", "Teacher", "Museum Educator", "Creative Arts Therapist"),
+    "SE": ("HR Manager", "Corporate Trainer", "Nonprofit Director", "Community Manager", "Healthcare Administrator"),
+    "EC": ("Financial Manager", "Supply Chain Manager", "Business Analyst", "Investment Analyst", "Operations Consultant"),
+    "CI": ("Actuarial Analyst", "Statistician", "Risk Analyst", "Business Intelligence Analyst", "Database Administrator"),
 }
+
+CAREER_CATALOG = tuple(sorted({career for careers in CAREER_MAP.values() for career in careers}))
+SKILLS_BY_THEME = {
+    "R": ("hands-on projects", "technical drawing or CAD", "lab or field experience"),
+    "I": ("data analysis", "research methods", "Python or scientific tools"),
+    "A": ("portfolio projects", "visual storytelling", "design tools"),
+    "S": ("communication", "active listening", "volunteering or mentoring"),
+    "E": ("presentation skills", "leadership", "business fundamentals"),
+    "C": ("spreadsheets", "attention to detail", "project organisation"),
+}
+
+# The career-discovery answers are free text, so use only clear, career-related
+# words as an early signal. The RIASEC quiz remains the more accurate profile.
+INTAKE_THEME_KEYWORDS = {
+    "R": ("build", "repair", "machine", "engine", "robot", "mechanical", "workshop", "hardware", "sport", "field work", "outdoor", "tool"),
+    "I": ("data", "science", "research", "analysis", "problem solving", "coding", "programming", "math", "technology", "experiment", "physics"),
+    "A": ("art", "design", "draw", "creative", "writing", "music", "film", "content", "photography", "story", "visual"),
+    "S": ("help", "teach", "people", "care", "counsel", "health", "community", "team", "psychology", "education", "volunteer"),
+    "E": ("business", "lead", "leadership", "management", "entrepreneur", "marketing", "sales", "law", "finance", "public speaking", "company"),
+    "C": ("organise", "organize", "plan", "detail", "account", "spreadsheet", "system", "structure", "admin", "logistics", "records"),
+}
+
+
+def load_job_catalog() -> dict[str, tuple[str, ...]]:
+    """Read the full user-provided job catalogue, organised by category."""
+    categories: dict[str, list[str]] = {}
+    current_category = "Career paths"
+    categories[current_category] = []
+    for raw_line in JOB_CATALOG_PATH.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if re.match(r"^\d+\.\s+", line):
+            current_category = re.sub(r"^\d+\.\s+", "", line)
+            categories.setdefault(current_category, [])
+        else:
+            categories[current_category].append(line)
+    return {category: tuple(dict.fromkeys(jobs)) for category, jobs in categories.items() if jobs}
+
+
+JOB_CATALOG = load_job_catalog()
+ALL_JOBS = tuple(sorted({job for jobs in JOB_CATALOG.values() for job in jobs}))
+
+
+def load_university_data() -> tuple[tuple[dict[str, str], ...], tuple[dict[str, str], ...]]:
+    """Read university recommendations and the master scholarship directory."""
+    lines = [line.strip() for line in UNIVERSITY_DATA_PATH.read_text(encoding="utf-8").splitlines()]
+    scholarships: list[dict[str, str]] = []
+    universities: list[dict[str, str]] = []
+    current_field = ""
+    in_master_directory = False
+    for line in lines:
+        if not line:
+            continue
+        if line == "Master Scholarship Directory (Applies Across Sectors)":
+            in_master_directory = True
+            continue
+        if line.startswith("1. ") and not in_master_directory:
+            continue
+        if re.match(r"^\d+\.\s+", line):
+            in_master_directory = False
+            current_field = re.sub(r"^\d+\.\s+", "", line)
+            continue
+        if line.startswith("Scholarship\tFunded By") or line.startswith("University\tCountry") or line.startswith("University/Institute\tCountry") or line.startswith("Institute\tCountry"):
+            continue
+        cells = [cell.strip() for cell in line.split("\t")]
+        if in_master_directory and len(cells) == 4:
+            scholarships.append({"name": cells[0], "funded_by": cells[1], "coverage": cells[2], "best_for": cells[3]})
+        elif current_field and len(cells) == 4:
+            universities.append({"field": current_field, "name": cells[0], "country": cells[1], "reputation": cells[2], "scholarships": cells[3]})
+    return tuple(universities), tuple(scholarships)
+
+
+UNIVERSITY_CATALOG, SCHOLARSHIP_CATALOG = load_university_data()
+
+
+@st.cache_data(ttl=60 * 60 * 24, show_spinner=False)
+def search_worldwide_universities(query: str, country: str) -> tuple[dict[str, str], ...]:
+    """Use OpenAlex's public institution index for a broad worldwide search.
+
+    It supplements the hand-curated recommendation data above. Results are
+    intentionally labelled as directory matches, not rankings or endorsements.
+    """
+    search = query.strip()
+    if not search and country == "All countries":
+        return ()
+    filters = ["types:education"]
+    if country != "All countries":
+        filters.append(f"country_code:{country_code(country)}")
+    params = {"per-page": "50", "filter": ",".join(filters)}
+    if search:
+        params["search"] = search
+    endpoint = "https://api.openalex.org/institutions?" + urlencode(params)
+    try:
+        request = Request(endpoint, headers={"User-Agent": "Career-AI-Student-Project/1.0"})
+        with urlopen(request, timeout=12) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (HTTPError, URLError, OSError, json.JSONDecodeError):
+        return ()
+    results: list[dict[str, str]] = []
+    for item in payload.get("results", []):
+        if item.get("type") != "education":
+            continue
+        location = item.get("geo") or {}
+        results.append({
+            "name": str(item.get("display_name") or "Unnamed institution"),
+            "country": str(item.get("country_code") or "").upper(),
+            "city": str(location.get("city") or ""),
+            "website": str(item.get("homepage_url") or ""),
+        })
+    return tuple(results)
+
+
+def country_code(country: str) -> str:
+    """Country names used in the UI mapped to ISO codes for OpenAlex."""
+    codes = {
+        "Afghanistan":"AF","Albania":"AL","Algeria":"DZ","Andorra":"AD","Angola":"AO","Antigua and Barbuda":"AG","Argentina":"AR","Armenia":"AM","Australia":"AU","Austria":"AT","Azerbaijan":"AZ","Bahamas":"BS","Bahrain":"BH","Bangladesh":"BD","Barbados":"BB","Belarus":"BY","Belgium":"BE","Belize":"BZ","Benin":"BJ","Bhutan":"BT","Bolivia":"BO","Bosnia and Herzegovina":"BA","Botswana":"BW","Brazil":"BR","Brunei":"BN","Bulgaria":"BG","Burkina Faso":"BF","Burundi":"BI","Cambodia":"KH","Cameroon":"CM","Canada":"CA","Cape Verde":"CV","Central African Republic":"CF","Chad":"TD","Chile":"CL","China":"CN","Colombia":"CO","Comoros":"KM","Congo":"CG","Costa Rica":"CR","Croatia":"HR","Cuba":"CU","Cyprus":"CY","Czech Republic":"CZ","Denmark":"DK","Djibouti":"DJ","Dominica":"DM","Dominican Republic":"DO","Ecuador":"EC","Egypt":"EG","El Salvador":"SV","Estonia":"EE","Eswatini":"SZ","Ethiopia":"ET","Fiji":"FJ","Finland":"FI","France":"FR","Gabon":"GA","Gambia":"GM","Georgia":"GE","Germany":"DE","Ghana":"GH","Greece":"GR","Grenada":"GD","Guatemala":"GT","Guinea":"GN","Guyana":"GY","Haiti":"HT","Honduras":"HN","Hong Kong":"HK","Hungary":"HU","Iceland":"IS","India":"IN","Indonesia":"ID","Iran":"IR","Iraq":"IQ","Ireland":"IE","Israel":"IL","Italy":"IT","Jamaica":"JM","Japan":"JP","Jordan":"JO","Kazakhstan":"KZ","Kenya":"KE","Kuwait":"KW","Kyrgyzstan":"KG","Laos":"LA","Latvia":"LV","Lebanon":"LB","Lesotho":"LS","Liberia":"LR","Libya":"LY","Liechtenstein":"LI","Lithuania":"LT","Luxembourg":"LU","Madagascar":"MG","Malawi":"MW","Malaysia":"MY","Maldives":"MV","Mali":"ML","Malta":"MT","Mauritius":"MU","Mexico":"MX","Moldova":"MD","Monaco":"MC","Mongolia":"MN","Montenegro":"ME","Morocco":"MA","Mozambique":"MZ","Myanmar":"MM","Namibia":"NA","Nepal":"NP","Netherlands":"NL","New Zealand":"NZ","Nicaragua":"NI","Niger":"NE","Nigeria":"NG","North Korea":"KP","North Macedonia":"MK","Norway":"NO","Oman":"OM","Pakistan":"PK","Palestine":"PS","Panama":"PA","Papua New Guinea":"PG","Paraguay":"PY","Peru":"PE","Philippines":"PH","Poland":"PL","Portugal":"PT","Qatar":"QA","Romania":"RO","Russia":"RU","Rwanda":"RW","Saint Kitts and Nevis":"KN","Saint Lucia":"LC","Saint Vincent and the Grenadines":"VC","Saudi Arabia":"SA","Senegal":"SN","Serbia":"RS","Seychelles":"SC","Sierra Leone":"SL","Singapore":"SG","Slovakia":"SK","Slovenia":"SI","Somalia":"SO","South Africa":"ZA","South Korea":"KR","Spain":"ES","Sri Lanka":"LK","Sudan":"SD","Suriname":"SR","Sweden":"SE","Switzerland":"CH","Syria":"SY","Taiwan":"TW","Tajikistan":"TJ","Tanzania":"TZ","Thailand":"TH","Timor-Leste":"TL","Togo":"TG","Tonga":"TO","Trinidad and Tobago":"TT","Tunisia":"TN","Turkey":"TR","Turkmenistan":"TM","Uganda":"UG","Ukraine":"UA","United Arab Emirates":"AE","United Kingdom":"GB","United States":"US","Uruguay":"UY","Uzbekistan":"UZ","Vanuatu":"VU","Venezuela":"VE","Vietnam":"VN","Yemen":"YE","Zambia":"ZM","Zimbabwe":"ZW",
+    }
+    return codes.get(country, "")
 
 THEMES = {
     "Dark": {"bg":"radial-gradient(circle at 70% 2%,#34206c 0,#170b31 38%,#0d0820 100%)", "text":"#fbfaff", "muted":"#bdb4d4", "card":"linear-gradient(145deg,rgba(37,24,76,.96),rgba(16,10,42,.96))", "soft":"rgba(35,23,71,.84)", "line":"rgba(190,156,255,.22)", "sidebar":"#0d0824", "input":"rgba(13,8,32,.78)", "shadow":"rgba(0,0,0,.27)", "score":"linear-gradient(135deg,#4d26c5,#1e4eaa)", "mentor":"linear-gradient(145deg,rgba(69,29,93,.86),rgba(18,11,45,.96))"},
@@ -174,7 +343,7 @@ THEMES = {
 
 
 def init_state() -> None:
-    defaults = {"app_stage":"login", "light_mode":False, "nav_page":"Dashboard", "student_name":"", "quiz_name":"", "intake_mode":None, "intake_index":0, "intake_answers":{}, "personality_mode":None, "personality_index":0, "personality_answers":{}, "personality_complete":False, "mentor_history":[]}
+    defaults = {"app_stage":"login", "auth_mode":"create", "light_mode":False, "nav_page":"Dashboard", "student_name":"", "student_email":"", "quiz_name":"", "intake_mode":None, "intake_index":0, "intake_answers":{}, "personality_mode":None, "personality_index":0, "personality_answers":{}, "personality_complete":False, "backend_profile":None, "backend_error":"", "top_matches":[], "career_insights":{}, "score_error":"", "local_roadmap_completed":set(), "mentor_history":[]}
     for key, value in defaults.items():
         st.session_state.setdefault(key, value)
 
@@ -187,11 +356,11 @@ def inject_styles() -> None:
     t = THEMES[theme_name()]
     st.markdown(f"""<style>
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
-    :root{{--bg:{t['bg']};--text:{t['text']};--muted:{t['muted']};--card:{t['card']};--soft:{t['soft']};--line:{t['line']};--sidebar:{t['sidebar']};--input:{t['input']};--shadow:{t['shadow']};--score:{t['score']};--mentor:{t['mentor']};--violet:#7c3aed;--pink:#ef5e7d;--mint:#15bfa2}} *{{font-family:'DM Sans',sans-serif}} .stApp{{background:var(--bg);color:var(--text)}} #MainMenu,footer{{visibility:hidden}} header{{background:transparent!important}} .block-container{{max-width:1500px;padding-top:1.5rem;padding-bottom:2.5rem}} [data-testid='stSidebar']{{background:var(--sidebar);border-right:1px solid rgba(211,193,255,.24)}} [data-testid='stSidebar'] *{{color:#f8f5ff!important}} h1,h2,h3{{font-family:'Space Grotesk',sans-serif;color:var(--text)}}
+    :root{{--bg:{t['bg']};--text:{t['text']};--muted:{t['muted']};--card:{t['card']};--soft:{t['soft']};--line:{t['line']};--sidebar:{t['sidebar']};--input:{t['input']};--shadow:{t['shadow']};--score:{t['score']};--mentor:{t['mentor']};--violet:#7c3aed;--pink:#ef5e7d;--mint:#15bfa2}} *{{font-family:'DM Sans',sans-serif}} .stApp{{background:var(--bg);color:var(--text)}} #MainMenu,footer{{visibility:hidden}} header,[data-testid='stHeader']{{background:transparent!important;height:2.8rem!important;pointer-events:none!important}} [data-testid='stHeader'] button{{pointer-events:auto!important}} [data-testid='stToolbar']{{display:none!important}} .block-container{{max-width:1500px;padding-top:2.2rem;padding-bottom:2.5rem}} [data-testid='stSidebar']{{background:var(--sidebar)!important;border-right:1px solid rgba(211,193,255,.24)!important;min-width:270px!important}} section[data-testid='stSidebar'][aria-expanded='false']{{min-width:270px!important;transform:translateX(0)!important;margin-left:0!important}} [data-testid='stSidebar'] *{{color:#f8f5ff!important}} h1,h2,h3{{font-family:'Space Grotesk',sans-serif;color:var(--text)}}
     .brand{{display:flex;align-items:center;gap:10px;margin:3px 0 20px}}.brand-name{{color:#fff;font:700 1.35rem 'Space Grotesk',sans-serif;white-space:nowrap}}.brand-name span{{color:#ff6b81}}.sidebar-tagline{{color:#cfc4eb;font-size:.73rem;white-space:nowrap}}.top-title{{font:700 2.25rem 'Space Grotesk',sans-serif;color:var(--text);letter-spacing:-1.4px;margin:0 0 3px}}.top-subtitle{{color:var(--muted);margin-bottom:18px}}.panel{{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:0 15px 38px var(--shadow);box-sizing:border-box}}.panel h3{{margin:0 0 8px}}.muted{{color:var(--muted)!important}}.accent{{color:#8b5cf6;font-weight:700}}.mint{{color:var(--mint);font-weight:700}}
     .choice-card{{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:27px;min-height:250px;text-align:center;box-shadow:0 15px 38px var(--shadow)}}.choice-icon{{font-size:2.6rem;margin-bottom:9px}}.quiz-step{{color:#8b5cf6;font-size:.85rem;font-weight:700;margin-bottom:10px}}.question-card{{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:29px;box-shadow:0 15px 38px var(--shadow)}}.question-number{{color:#8b5cf6;font-weight:700}}.question-text{{font:600 1.6rem 'Space Grotesk',sans-serif;color:var(--text);line-height:1.35;margin:13px 0 21px}}.progress-shell{{height:8px;background:rgba(124,58,237,.16);border-radius:999px;overflow:hidden;margin:11px 0 25px}}.progress-fill{{height:100%;background:linear-gradient(90deg,#7c3aed,#ef5e7d);border-radius:999px}}.result-code{{font:700 3.2rem 'Space Grotesk',sans-serif;color:#8b5cf6;letter-spacing:4px}}.result-number{{font:700 2.7rem 'Space Grotesk',sans-serif;color:var(--text)}}.match-grid{{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}}.match-card{{background:var(--soft);border:1px solid var(--line);border-radius:13px;padding:15px;min-height:160px}}.match-pill{{float:right;color:var(--mint);background:rgba(21,191,162,.13);padding:4px 8px;border-radius:8px;font-size:.74rem;font-weight:700}}.icon-bubble{{width:43px;height:43px;display:grid;place-items:center;border-radius:14px;background:linear-gradient(145deg,rgba(255,255,255,.62),rgba(177,138,255,.28));border:1px solid rgba(255,255,255,.7);box-shadow:inset 0 1px rgba(255,255,255,.9),0 8px 17px rgba(70,35,155,.2);font-size:1.35rem}}.score-panel{{background:var(--score);border-radius:18px;padding:23px;color:#fff;min-height:228px}}.score-panel *{{color:#fff}}.big-score{{font:700 3.2rem 'Space Grotesk',sans-serif;margin:22px 0 8px}}.ai-card{{background:var(--mentor);border:1px solid rgba(236,91,122,.38);border-radius:18px;padding:20px;margin-bottom:17px}}.ai-card p{{color:var(--muted)}}
     .login-visual{{position:relative;min-height:610px;display:flex;align-items:center;justify-content:center;overflow:hidden}}.login-orbit{{position:absolute;width:470px;height:470px;border:1px dashed rgba(154,105,255,.34);border-radius:50%}}.login-message{{position:relative;z-index:2;max-width:500px;text-align:center;font:700 3.1rem/1.05 'Space Grotesk',sans-serif;color:var(--text);letter-spacing:-2px}}.login-message span{{color:#ef5e7d}}.float-career{{position:absolute;z-index:3;display:grid;place-items:center;width:93px;height:93px;border-radius:27px;border:1px solid var(--line);background:var(--soft);box-shadow:0 13px 32px var(--shadow);font-size:3rem;animation:career-drift 4s ease-in-out infinite}}.career-1{{top:48px;left:15%}}.career-2{{top:48px;right:15%;animation-delay:-1s}}.career-3{{top:235px;left:2%;animation-delay:-2s}}.career-4{{top:235px;right:2%;animation-delay:-.5s}}.career-5{{bottom:46px;left:17%;animation-delay:-2.5s}}.career-6{{bottom:46px;right:17%;animation-delay:-1.5s}}@keyframes career-drift{{50%{{transform:translateY(-12px) rotate(3deg)}}}}
-    .st-key-ai_mentor_card{{background:var(--mentor);border:1px solid rgba(236,91,122,.44)!important;border-radius:17px;padding:12px 13px 16px;box-shadow:0 15px 38px var(--shadow);text-align:center}}[data-testid='stImage'] img{{filter:drop-shadow(0 0 7px rgba(163,99,255,.9)) drop-shadow(0 0 18px rgba(236,91,122,.42));animation:logo-glow 2.8s ease-in-out infinite}}@keyframes logo-glow{{50%{{filter:drop-shadow(0 0 12px rgba(181,114,255,1)) drop-shadow(0 0 30px rgba(255,91,141,.7))}}}}
+    .st-key-ai_mentor_card{{background:var(--mentor);border:1px solid rgba(236,91,122,.44)!important;border-radius:17px;padding:12px 13px 16px;box-shadow:0 15px 38px var(--shadow);text-align:center}}[data-testid='stImage'] img{{filter:drop-shadow(0 0 7px rgba(163,99,255,.9)) drop-shadow(0 0 18px rgba(236,91,122,.42));animation:logo-glow 2.8s ease-in-out infinite;object-fit:contain!important}}@keyframes logo-glow{{50%{{filter:drop-shadow(0 0 12px rgba(181,114,255,1)) drop-shadow(0 0 30px rgba(255,91,141,.7))}}}}
     div[data-baseweb='input']>div,div[data-baseweb='textarea']>div{{background:var(--input)!important;border-color:var(--line)!important;color:var(--text)!important}}input,textarea{{color:var(--text)!important}}.stButton>button,button[kind='primary']{{background:linear-gradient(90deg,#7c3aed,#ef5e7d);color:#fff;border:1px solid rgba(255,255,255,.16);border-radius:12px;font-weight:700;min-height:43px;box-shadow:0 8px 18px rgba(95,45,199,.24);transition:.24s}}.stButton>button:hover,button[kind='primary']:hover{{transform:translateY(-2px);color:var(--text);background:linear-gradient(135deg,rgba(255,255,255,.35),rgba(181,143,255,.22));border-color:rgba(255,255,255,.68);box-shadow:inset 0 1px rgba(255,255,255,.82),0 12px 28px rgba(110,55,220,.32);backdrop-filter:blur(16px)}}[data-testid='stSidebar'] .stRadio label{{padding:7px 5px;border-radius:10px;background:linear-gradient(145deg,rgba(255,255,255,.1),rgba(145,98,255,.08));border:1px solid rgba(255,255,255,.1)}}
     @media(max-width:900px){{.block-container{{padding:1rem}}.match-grid{{grid-template-columns:1fr}}.top-title{{font-size:1.9rem}}.question-text{{font-size:1.3rem}}}}
     </style>""", unsafe_allow_html=True)
@@ -201,6 +370,11 @@ def reset_quiz(mode: str) -> None:
     st.session_state.intake_mode = mode
     st.session_state.intake_index = 0
     st.session_state.intake_answers = {}
+    st.session_state.backend_profile = None
+    st.session_state.backend_error = ""
+    st.session_state.top_matches = []
+    st.session_state.career_insights = {}
+    st.session_state.score_error = ""
     st.session_state.app_stage = "intake"
 
 
@@ -208,6 +382,11 @@ def start_personality(mode: str) -> None:
     st.session_state.personality_mode = mode
     st.session_state.personality_index = 0
     st.session_state.personality_answers = {}
+    st.session_state.backend_profile = None
+    st.session_state.backend_error = ""
+    st.session_state.top_matches = []
+    st.session_state.career_insights = {}
+    st.session_state.score_error = ""
     # Clear old widget values so a new quiz always starts fresh.
     for key in list(st.session_state):
         if key.startswith("radio_p_") or key.startswith("slider_p_"):
@@ -223,45 +402,534 @@ def personality_questions() -> tuple[tuple[str, str], ...]:
     return SHORT_RIASEC_QUESTIONS if st.session_state.personality_mode == "riasec_short" else RIASEC_QUESTIONS
 
 
-def riasec_scores() -> dict[str, int]:
+def local_riasec_scores() -> dict[str, int]:
     scores = {code: 0 for code in RIASEC}
     for index, (code, _) in enumerate(personality_questions()):
         scores[code] += int(st.session_state.personality_answers.get(f"p_{index}", 3))
     return scores
 
 
+def intake_theme_scores() -> dict[str, int]:
+    """Return lightweight interest signals from completed open-text answers."""
+    answers = st.session_state.intake_answers.values()
+    combined = " ".join(str(answer).lower() for answer in answers)
+    scores: dict[str, int] = {code: 0 for code in RIASEC}
+    for code, keywords in INTAKE_THEME_KEYWORDS.items():
+        scores[code] = sum(combined.count(keyword) for keyword in keywords)
+    return scores
+
+
+def active_theme_ranking() -> list[str]:
+    """Use RIASEC after it is completed; otherwise use the discovery answers."""
+    if st.session_state.personality_complete:
+        scores = riasec_scores()
+    else:
+        scores = intake_theme_scores()
+    return sorted(scores, key=scores.get, reverse=True)
+
+
+def dashboard_suitability_score() -> int:
+    """A transparent profile-completeness score until the backend returns a match."""
+    if st.session_state.top_matches:
+        first = st.session_state.top_matches[0]
+        raw_score = first.get("score") or first.get("match_score") or first.get("percentage")
+        try:
+            return max(0, min(100, round(float(str(raw_score).replace("%", "")))))
+        except (TypeError, ValueError):
+            pass
+    answered_intake = len([answer for answer in st.session_state.intake_answers.values() if str(answer).strip()])
+    intake_part = round(25 * answered_intake / max(1, len(intake_questions())))
+    answered_personality = len(st.session_state.personality_answers)
+    personality_part = round(45 * answered_personality / max(1, len(personality_questions())))
+    return min(95, 30 + intake_part + personality_part)
+
+
+def riasec_scores() -> dict[str, int]:
+    """Prefer the scores calculated by FastAPI after the profile is saved."""
+    saved_profile = st.session_state.backend_profile or {}
+    saved_scores = saved_profile.get("riasec_scores", {}) if isinstance(saved_profile, dict) else {}
+    if isinstance(saved_scores, dict) and all(code in saved_scores for code in RIASEC):
+        try:
+            return {code: int(saved_scores[code]) for code in RIASEC}
+        except (TypeError, ValueError):
+            pass
+    return local_riasec_scores()
+
+
+def profile_api_url() -> str:
+    try:
+        return str(st.secrets.get("PROFILE_API_URL", os.getenv("PROFILE_API_URL", DEFAULT_PROFILE_API_URL))).rstrip("/")
+    except FileNotFoundError:
+        return os.getenv("PROFILE_API_URL", DEFAULT_PROFILE_API_URL).rstrip("/")
+
+
+def careers_api_url() -> str:
+    """URL for the FastAPI route that calls list_careers()."""
+    try:
+        return str(st.secrets.get("CAREERS_API_URL", os.getenv("CAREERS_API_URL", DEFAULT_CAREERS_API_URL))).rstrip("/")
+    except FileNotFoundError:
+        return os.getenv("CAREERS_API_URL", DEFAULT_CAREERS_API_URL).rstrip("/")
+
+
+def chat_api_url() -> str:
+    """Base URL for POST /chat and GET /chat/{student_id}."""
+    try:
+        return str(st.secrets.get("CHAT_API_URL", os.getenv("CHAT_API_URL", DEFAULT_CHAT_API_URL))).rstrip("/")
+    except FileNotFoundError:
+        return os.getenv("CHAT_API_URL", DEFAULT_CHAT_API_URL).rstrip("/")
+
+
+def roadmap_api_url() -> str:
+    """Base URL for GET /roadmap/{student_id} and its step PATCH endpoint."""
+    try:
+        return str(st.secrets.get("ROADMAP_API_URL", os.getenv("ROADMAP_API_URL", DEFAULT_ROADMAP_API_URL))).rstrip("/")
+    except FileNotFoundError:
+        return os.getenv("ROADMAP_API_URL", DEFAULT_ROADMAP_API_URL).rstrip("/")
+
+
+def score_api_url() -> str:
+    """Base URL for POST /score and POST /score/insights."""
+    try:
+        return str(st.secrets.get("SCORE_API_URL", os.getenv("SCORE_API_URL", DEFAULT_SCORE_API_URL))).rstrip("/")
+    except FileNotFoundError:
+        return os.getenv("SCORE_API_URL", DEFAULT_SCORE_API_URL).rstrip("/")
+
+
+def auth_api_url() -> str:
+    try:
+        return str(st.secrets.get("AUTH_API_URL", os.getenv("AUTH_API_URL", DEFAULT_AUTH_API_URL))).rstrip("/")
+    except FileNotFoundError:
+        return os.getenv("AUTH_API_URL", DEFAULT_AUTH_API_URL).rstrip("/")
+
+
+def active_student_id() -> str:
+    profile = st.session_state.backend_profile or {}
+    return str(profile.get("student_id", ""))
+
+
+def post_json(url: str, payload: dict[str, object], action: str) -> tuple[dict[str, object] | None, str]:
+    request = Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=25) as response:
+            data = json.loads(response.read().decode("utf-8"))
+        if not isinstance(data, dict):
+            return None, f"{action} API did not return an object."
+        return data, ""
+    except HTTPError as error:
+        details = error.read().decode("utf-8", errors="replace")
+        return None, f"{action} API rejected the request ({error.code}): {details}"
+    except URLError:
+        return None, f"Could not reach the {action.lower()} backend at {url}."
+    except (OSError, json.JSONDecodeError) as error:
+        return None, f"Could not load {action.lower()}: {error}"
+
+
+def auth_post(endpoint: str, payload: dict[str, str]) -> tuple[dict[str, object] | None, str]:
+    return post_json(f"{auth_api_url()}/{endpoint}", payload, "Authentication")
+
+
+def fetch_scores_and_insights(student_id: str) -> tuple[list[dict[str, object]], dict[str, object], str]:
+    """Calls score_profile, then score_insights so the roadmap is saved."""
+    score_response, error = post_json(score_api_url(), {"student_id": student_id}, "Career scoring")
+    if error or not score_response:
+        return [], {}, error
+    matches = score_response.get("top_matches", [])
+    if not isinstance(matches, list):
+        return [], {}, "Career scoring API did not return top_matches."
+    clean_matches = [match for match in matches if isinstance(match, dict)]
+    insight_response, insight_error = post_json(
+        f"{score_api_url()}/insights",
+        {"student_id": student_id, "top_matches": clean_matches},
+        "Career insights",
+    )
+    return clean_matches, insight_response or {}, insight_error
+
+
+def match_title(match: dict[str, object]) -> str:
+    return str(match.get("career") or match.get("career_name") or match.get("name") or match.get("title") or "Career path")
+
+
+def match_score(match: dict[str, object]) -> str:
+    score = match.get("score", match.get("match_score", match.get("suitability_score")))
+    if score is None:
+        return "Strong match"
+    try:
+        number = float(score)
+        return f"{number:.0f}%" if number <= 100 else f"{number:.0f}"
+    except (TypeError, ValueError):
+        return str(score)
+
+
+def send_chat_to_backend(student_id: str, message: str) -> tuple[str, str]:
+    """Calls your FastAPI chat(payload: ChatRequest) endpoint."""
+    request = Request(
+        chat_api_url(),
+        data=json.dumps({"student_id": student_id, "message": message}).encode("utf-8"),
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=20) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        reply = payload.get("reply")
+        if not reply:
+            return "", "The chat API did not return a reply."
+        return str(reply), ""
+    except HTTPError as error:
+        details = error.read().decode("utf-8", errors="replace")
+        return "", f"Chat backend rejected the message ({error.code}): {details}"
+    except URLError:
+        return "", f"Could not reach the chat backend at {chat_api_url()}."
+    except (OSError, json.JSONDecodeError) as error:
+        return "", f"Could not send message: {error}"
+
+
+@st.cache_data(ttl=15, show_spinner=False)
+def load_chat_history(student_id: str, url: str) -> tuple[list[dict[str, object]], str]:
+    """Calls GET /chat/{student_id} and normalizes its messages array."""
+    request = Request(f"{url}/{student_id}", headers={"Accept": "application/json"}, method="GET")
+    try:
+        with urlopen(request, timeout=10) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        messages = payload.get("messages", [])
+        if not isinstance(messages, list):
+            return [], "The chat history API did not return a messages list."
+        return [message for message in messages if isinstance(message, dict)], ""
+    except HTTPError as error:
+        return [], f"Could not load chat history ({error.code})."
+    except URLError:
+        return [], f"Could not reach the chat backend at {url}."
+    except (OSError, json.JSONDecodeError) as error:
+        return [], f"Could not load chat history: {error}"
+
+
+def chat_message_text(message: dict[str, object]) -> str:
+    return str(message.get("message") or message.get("content") or message.get("text") or "")
+
+
+def chat_message_role(message: dict[str, object]) -> str:
+    role = str(message.get("role") or message.get("sender") or "ai").lower()
+    return "student" if role in {"student", "user"} else "ai"
+
+
+@st.cache_data(ttl=15, show_spinner=False)
+def load_roadmap(student_id: str, url: str) -> tuple[list[dict[str, object]], str]:
+    """Calls GET /roadmap/{student_id} and returns the saved roadmap steps."""
+    request = Request(f"{url}/{student_id}", headers={"Accept": "application/json"}, method="GET")
+    try:
+        with urlopen(request, timeout=10) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        steps = payload.get("steps", [])
+        if not isinstance(steps, list):
+            return [], "The roadmap API did not return a steps list."
+        return [step for step in steps if isinstance(step, dict)], ""
+    except HTTPError as error:
+        return [], f"Could not load your roadmap ({error.code})."
+    except URLError:
+        return [], f"Could not reach the roadmap backend at {url}."
+    except (OSError, json.JSONDecodeError) as error:
+        return [], f"Could not load roadmap: {error}"
+
+
+def roadmap_step_id(step: dict[str, object]) -> int | None:
+    value = step.get("step_id", step.get("id"))
+    try:
+        return int(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def roadmap_step_title(step: dict[str, object], position: int) -> str:
+    return str(step.get("title") or step.get("name") or step.get("step") or f"Roadmap step {position}")
+
+
+def update_roadmap_step(student_id: str, step_id: int, completed: bool) -> str:
+    """Calls PATCH /roadmap/{student_id}/steps/{step_id}."""
+    request = Request(
+        f"{roadmap_api_url()}/{student_id}/steps/{step_id}",
+        data=json.dumps({"completed": completed}).encode("utf-8"),
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        method="PATCH",
+    )
+    try:
+        with urlopen(request, timeout=10):
+            return ""
+    except HTTPError as error:
+        details = error.read().decode("utf-8", errors="replace")
+        return f"Could not update this step ({error.code}): {details}"
+    except URLError:
+        return f"Could not reach the roadmap backend at {roadmap_api_url()}."
+    except OSError as error:
+        return f"Could not update roadmap: {error}"
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def load_careers_from_backend(url: str) -> tuple[list[dict[str, object]], str]:
+    """Fetches GET /careers, which should return db.get_all_careers()."""
+    request = Request(url, headers={"Accept": "application/json"}, method="GET")
+    try:
+        with urlopen(request, timeout=8) as response:
+            careers = json.loads(response.read().decode("utf-8"))
+        if not isinstance(careers, list):
+            return [], "The careers API did not return a list."
+        return [career for career in careers if isinstance(career, dict)], ""
+    except HTTPError as error:
+        return [], f"Career API returned {error.code}."
+    except URLError:
+        return [], f"Could not reach the careers backend at {url}."
+    except (OSError, json.JSONDecodeError) as error:
+        return [], f"Could not load careers: {error}"
+
+
+def career_title(career: dict[str, object]) -> str:
+    """Supports common database field names without breaking the UI."""
+    for key in ("name", "title", "career_name", "role"):
+        value = career.get(key)
+        if value:
+            return str(value)
+    return "Career path"
+
+
+def career_description(career: dict[str, object]) -> str:
+    for key in ("description", "summary", "about", "overview"):
+        value = career.get(key)
+        if value:
+            return str(value)
+    return "Explore this career path, its required skills, and study options."
+
+
+def intake_answers_by_section() -> dict[str, list[str]]:
+    grouped: dict[str, list[str]] = {}
+    for index, (section, _) in enumerate(intake_questions()):
+        answer = st.session_state.intake_answers.get(f"intake_{index}", "").strip()
+        if answer:
+            grouped.setdefault(section, []).append(answer)
+    return grouped
+
+
+def build_profile_payload() -> dict[str, object]:
+    """Build the exact fields consumed by the ProfileIntake backend model."""
+    grouped = intake_answers_by_section()
+    # Backend scores two ratings per theme in R, I, A, S, E, C order.
+    # For the 60-question UI, average the ten ratings per theme and repeat it
+    # twice; for quick mode, it simply preserves the two chosen ratings.
+    answers_by_theme: dict[str, list[int]] = {code: [] for code in RIASEC}
+    for index, (code, _) in enumerate(personality_questions()):
+        answers_by_theme[code].append(int(st.session_state.personality_answers.get(f"p_{index}", 3)))
+    riasec_answers = [
+        rating
+        for code in RIASEC
+        for rating in (
+            answers_by_theme[code][:2]
+            if st.session_state.personality_mode == "riasec_short"
+            else [round(sum(answers_by_theme[code]) / len(answers_by_theme[code]))] * 2
+        )
+    ]
+    return {
+        "name": st.session_state.student_name.strip(),
+        "email": st.session_state.student_email.strip(),
+        "interests": grouped.get("Interests & passions", []),
+        "hobbies": grouped.get("Hobbies & activities", []),
+        # The current UI collects written answers, so these remain empty until
+        # numeric subject marks/skill ratings are added to the quiz.
+        "academics": {},
+        "self_rated_skills": {},
+        "riasec_answers": riasec_answers,
+    }
+
+
+def save_profile_to_backend() -> tuple[dict[str, object] | None, str]:
+    """POST the quiz profile to FastAPI's create_profile endpoint."""
+    if not st.session_state.student_name.strip():
+        return None, "Please enter your name in the first career-quiz question."
+    if not st.session_state.student_email.strip():
+        return None, "Please enter an email address in the first career-quiz question."
+    payload = build_profile_payload()
+    request = Request(
+        profile_api_url(),
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=10) as response:
+            return json.loads(response.read().decode("utf-8")), ""
+    except HTTPError as error:
+        details = error.read().decode("utf-8", errors="replace")
+        return None, f"Backend rejected the profile ({error.code}): {details}"
+    except URLError:
+        return None, f"Could not reach the profile backend at {profile_api_url()}."
+    except (OSError, json.JSONDecodeError) as error:
+        return None, f"Could not save the profile: {error}"
+
+
 def career_suggestions() -> tuple[str, ...]:
     if not st.session_state.personality_complete:
-        return ("UX Designer", "Data Analyst", "Clinical Psychologist")
-    ranked = sorted(riasec_scores(), key=riasec_scores().get, reverse=True)
+        ranked = active_theme_ranking()
+        # Avoid arbitrary results when the learner has not written any answers yet.
+        if not any(intake_theme_scores().values()):
+            return CAREER_CATALOG[:5]
+        code = "".join(ranked[:2])
+        return CAREER_MAP.get(code) or CAREER_MAP.get(code[::-1]) or CAREER_MAP[ranked[0]]
+    ranked = active_theme_ranking()
     code = "".join(ranked[:2])
     return CAREER_MAP.get(code) or CAREER_MAP.get(code[::-1]) or CAREER_MAP[ranked[0]]
+
+
+def personalized_roadmap_steps() -> tuple[dict[str, object], ...]:
+    """Useful non-random fallback steps when the backend roadmap is unavailable."""
+    ranked = active_theme_ranking()
+    first, second = ranked[:2]
+    careers = career_suggestions()[:3]
+    return (
+        {"id": 1, "title": f"Explore {RIASEC[first][0]} careers", "description": f"Compare {', '.join(careers)} and note the entry requirements.", "completed": False},
+        {"id": 2, "title": f"Build {RIASEC[first][0]} strengths", "description": f"Start with {', '.join(SKILLS_BY_THEME[first][:2])}.", "completed": False},
+        {"id": 3, "title": f"Add {RIASEC[second][0]} experience", "description": f"Try {SKILLS_BY_THEME[second][2]} through a club, course, project, or internship.", "completed": False},
+        {"id": 4, "title": "Create a career evidence folder", "description": "Save projects, certificates, reflections, and achievements for your preferred career paths.", "completed": False},
+    )
+
+
+def university_recommendations() -> tuple[dict[str, str], ...]:
+    """Match university fields to the student's strongest RIASEC themes."""
+    ranked = active_theme_ranking()
+    # Keep the ranking order: using a set here made equally rated themes appear
+    # in an unpredictable order and led to the same three default suggestions.
+    themes = tuple(RIASEC[code][0] for code in ranked[:2])
+    field_keywords = {
+        "Realistic": ("Engineering", "Skilled Trades", "Manufacturing", "Transportation", "Energy", "Agriculture"),
+        "Investigative": ("Technology", "Engineering", "Healthcare", "Science", "Environment", "Emerging"),
+        "Artistic": ("Arts", "Media", "Writing", "Beauty", "Skilled Craft"),
+        "Social": ("Healthcare", "Education", "Social Services", "Hospitality", "Sports"),
+        "Enterprising": ("Business", "Marketing", "Law", "Government", "Real Estate", "Retail", "Freelance"),
+        "Conventional": ("Business", "Technology", "Manufacturing", "Transportation", "Retail"),
+    }
+    matching_fields = tuple(keyword for theme in themes for keyword in field_keywords[theme])
+    matches = [
+        university for university in UNIVERSITY_CATALOG
+        if any(keyword.lower() in university["field"].lower() for keyword in matching_fields)
+    ]
+    # Surface choices belonging to the highest-scoring theme first, then fill
+    # any remaining cards with the student's second strongest theme.
+    ordered_matches: list[dict[str, str]] = []
+    for theme in themes:
+        for university in UNIVERSITY_CATALOG:
+            if any(keyword.lower() in university["field"].lower() for keyword in field_keywords[theme]):
+                if university not in ordered_matches:
+                    ordered_matches.append(university)
+    return tuple((ordered_matches or matches or list(UNIVERSITY_CATALOG))[:3])
+
+
+def university_recommendation_reason() -> str:
+    """Explain the exact profile signal used for the university cards."""
+    ranked = active_theme_ranking()
+    top_themes = " and ".join(RIASEC[code][0] for code in ranked[:2])
+    if st.session_state.personality_complete:
+        return f"Matched to your strongest RIASEC themes: {top_themes}."
+    if any(intake_theme_scores().values()):
+        return f"Matched to interests in your written career-quiz answers: {top_themes}. Complete RIASEC to refine this further."
+    return "Complete the career quiz to receive recommendations based on your own answers."
 
 
 def profile_name() -> str:
     return st.session_state.student_name or "Student"
 
 
+def is_valid_email(email: str) -> bool:
+    """Validates a realistic email format before the app accepts it."""
+    pattern = r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$"
+    return bool(re.fullmatch(pattern, email.strip()))
+
+
+def is_meaningful_answer(answer: str) -> bool:
+    """Reject blank/placeholders while allowing brief factual quiz answers."""
+    cleaned = answer.strip().lower()
+    compact = re.sub(r"\s+", "", cleaned)
+    letters = re.sub(r"[^a-z]", "", cleaned)
+    blocked = {"asdf", "asdfgh", "qwerty", "qwertyuiop", "test", "testing", "none", "na", "n/a", "idk", "xxx", "abc", "abcd"}
+    if not cleaned or cleaned in blocked:
+        return False
+    # Many profile questions genuinely need concise factual responses.
+    if cleaned in {"yes", "no", "y", "n", "true", "false", "maybe"}:
+        return True
+    if re.fullmatch(r"[+-]?\d+(?:\.\d+)?\s*%?", cleaned):
+        return True
+    if len(cleaned) < 3 or (letters and len(set(letters)) == 1):
+        return False
+    if len(letters) < 2:
+        return False
+    return True
+
+
 def render_theme_toggle() -> None:
     _, col = st.columns([5, 1])
     with col:
-        st.toggle("☀️ Light mode", key="light_mode")
+        label = "🌙 Dark mode" if st.session_state.light_mode else "☀️ Light mode"
+        if st.button(label, key="theme_mode_button", use_container_width=True):
+            st.session_state.light_mode = not st.session_state.light_mode
+            st.rerun()
 
 
 def render_login() -> None:
     render_theme_toggle()
     left, right = st.columns([.92, 1.08], gap="large")
     with left:
+        creating_account = st.session_state.auth_mode == "create"
         st.image(LOGO_PATH, width=86)
-        st.markdown("<div class='panel'><div class='brand'><div class='brand-name'>Career <span>AI</span></div></div><h1 class='top-title'>Welcome back</h1><p class='top-subtitle'>Your future is waiting.</p>", unsafe_allow_html=True)
-        username = st.text_input("Username or email", placeholder="Enter your username or email", key="username_input")
-        st.text_input("Password", placeholder="Enter your password", type="password")
+        heading = "Create your account" if creating_account else "Welcome back"
+        subtitle = "Start exploring your future." if creating_account else "Log in to continue your career journey."
+        st.markdown(f"<div class='panel'><div class='brand'><div class='brand-name'>Career <span>AI</span></div></div><h1 class='top-title'>{heading}</h1><p class='top-subtitle'>{subtitle}</p>", unsafe_allow_html=True)
+        email = st.text_input("Email address", placeholder="you@example.com", key="email_input")
+        display_name = ""
+        if creating_account:
+            display_name = st.text_input("What should we call you?", placeholder="Enter your name", key="name_input")
+        password = st.text_input("Password", placeholder="Enter your password", type="password", key="password_input")
+        if creating_account:
+            st.caption("Create your own password.")
         st.checkbox("Remember me")
-        if st.button("Sign in  →", use_container_width=True):
-            st.session_state.student_name = username.split("@")[0].strip().title() or "Student"
-            st.session_state.app_stage = "welcome"
+        submit_label = "Create account  →" if creating_account else "Log in  →"
+        if st.button(submit_label, use_container_width=True):
+            clean_email = email.strip()
+            if not is_valid_email(clean_email):
+                st.error("Please enter a valid email address, for example you@example.com.")
+            elif not password:
+                st.error("Please enter your password.")
+            elif creating_account and not display_name.strip():
+                st.error("Please enter the name you would like us to use.")
+            elif creating_account and len(password) < 8:
+                st.error("Your password must contain at least 8 characters.")
+            else:
+                endpoint = "register" if creating_account else "login"
+                payload = {"email": clean_email, "password": password}
+                if creating_account:
+                    payload["name"] = display_name.strip().title()
+                with st.spinner("Setting up your account…"):
+                    account, error = auth_post(endpoint, payload)
+                if error:
+                    st.error(error)
+                else:
+                    st.session_state.student_name = str(account["name"])
+                    st.session_state.student_email = str(account["email"])
+                    student_id = account.get("student_id")
+                    if student_id:
+                        st.session_state.backend_profile = {
+                            "student_id": str(student_id),
+                            "name": st.session_state.student_name,
+                            "email": st.session_state.student_email,
+                        }
+                        st.session_state.app_stage = "dashboard"
+                    else:
+                        st.session_state.app_stage = "welcome"
+                    st.rerun()
+        switch_label = "Already have an account? Log in" if creating_account else "New to Career AI? Create an account"
+        if st.button(switch_label, use_container_width=True, key="switch_auth_mode"):
+            st.session_state.auth_mode = "login" if creating_account else "create"
             st.rerun()
-        st.markdown("<p class='muted' style='text-align:center'>New to Career AI? <span class='accent'>Create an account</span></p></div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
     with right:
         st.markdown("""
         <div class='login-visual'>
@@ -299,12 +967,19 @@ def render_intake() -> None:
     st.markdown(f"<div class='top-title'>Career Discovery Quiz</div><div class='top-subtitle'>{'Quick' if st.session_state.intake_mode == 'short' else 'Complete'} version · Answer honestly — there are no right answers.</div><div class='quiz-step'>{section}</div><div class='progress-shell'><div class='progress-fill' style='width:{percent}%'></div></div>", unsafe_allow_html=True)
     st.markdown(f"<div class='question-card'><div class='question-number'>QUESTION {index + 1} OF {len(questions)}</div><div class='question-text'>{escape(prompt)}</div>", unsafe_allow_html=True)
     quiz_name = st.session_state.student_name
+    quiz_email = st.session_state.student_email
     if index == 0:
         quiz_name = st.text_input(
             "What should we call you?",
             value=st.session_state.student_name,
             placeholder="Enter your name",
             key="quiz_display_name",
+        )
+        quiz_email = st.text_input(
+            "Email address",
+            value=st.session_state.student_email,
+            placeholder="you@example.com",
+            key="quiz_email",
         )
     key = f"intake_{index}"
     answer = st.text_area("Your answer", value=st.session_state.intake_answers.get(key, ""), placeholder="Write your answer here…", height=175, key=f"widget_{key}")
@@ -318,8 +993,18 @@ def render_intake() -> None:
     with next_col:
         next_label = "Finish quiz  →" if index == len(questions) - 1 else "Next question  →"
         if st.button(next_label, use_container_width=True):
-            if index == 0 and quiz_name.strip():
+            if not is_meaningful_answer(answer):
+                st.error("Please enter a real answer. Short answers such as yes/no, a score like 85, or 92% are accepted; placeholders like “asdf” are not.")
+                return
+            if index == 0:
+                if not quiz_name.strip():
+                    st.error("Please enter the name you would like us to use.")
+                    return
+                if not is_valid_email(quiz_email):
+                    st.error("Please enter a valid email address, for example you@example.com.")
+                    return
                 st.session_state.student_name = quiz_name.strip().title()
+                st.session_state.student_email = quiz_email.strip()
             st.session_state.intake_answers[key] = answer.strip()
             if index == len(questions) - 1:
                 st.session_state.app_stage = "intake_results"
@@ -359,7 +1044,8 @@ def render_personality() -> None:
     quiz_title = "Quick RIASEC Personality Quiz" if st.session_state.personality_mode == "riasec_short" else "Full RIASEC Personality Quiz"
     st.markdown(f"<div class='top-title'>{quiz_title}</div><div class='top-subtitle'>Rate each statement based on how you actually feel. 1 = strongly disagree · 5 = strongly agree.</div><div class='progress-shell'><div class='progress-fill' style='width:{round((index+1)*100/len(questions))}%'></div></div>", unsafe_allow_html=True)
     st.markdown(f"<div class='question-card'><div class='question-number'>{icon} {name.upper()} · QUESTION {index+1} OF {len(questions)}</div><div class='question-text'>{escape(statement)}</div>", unsafe_allow_html=True)
-    value = st.radio("Your rating", (1, 2, 3, 4, 5), index=int(st.session_state.personality_answers.get(value_key, 3)) - 1, horizontal=True, format_func=lambda number: {1:"1 · Strongly disagree",2:"2 · Disagree",3:"3 · Neutral",4:"4 · Agree",5:"5 · Strongly agree"}[number], key=f"radio_{value_key}")
+    saved_value = st.session_state.personality_answers.get(value_key)
+    value = st.radio("Your rating", (1, 2, 3, 4, 5), index=int(saved_value) - 1 if saved_value else None, horizontal=True, format_func=lambda number: {1:"1 · Strongly disagree",2:"2 · Disagree",3:"3 · Neutral",4:"4 · Agree",5:"5 · Strongly agree"}[number], key=f"radio_{value_key}")
     st.markdown("</div>", unsafe_allow_html=True)
     previous, _, next_col = st.columns([1, 2, 1])
     with previous:
@@ -370,9 +1056,23 @@ def render_personality() -> None:
     with next_col:
         final = index == len(questions) - 1
         if st.button("See results  →" if final else "Next question  →", use_container_width=True, key="personality_next"):
+            if value is None:
+                st.error("Please select a rating before continuing.")
+                return
             st.session_state.personality_answers[value_key] = value
             if final:
                 st.session_state.personality_complete = True
+                with st.spinner("Saving your profile and generating recommendations…"):
+                    saved_profile, error = save_profile_to_backend()
+                st.session_state.backend_profile = saved_profile
+                st.session_state.backend_error = error
+                student_id = str((saved_profile or {}).get("student_id", ""))
+                if student_id:
+                    with st.spinner("Finding your strongest career matches…"):
+                        matches, insights, score_error = fetch_scores_and_insights(student_id)
+                    st.session_state.top_matches = matches
+                    st.session_state.career_insights = insights
+                    st.session_state.score_error = score_error
                 st.session_state.app_stage = "personality_results"
             else:
                 st.session_state.personality_index += 1
@@ -384,10 +1084,18 @@ def render_personality_results() -> None:
     scores = riasec_scores()
     ranked = sorted(scores, key=scores.get, reverse=True)
     code = "".join(ranked[:2])
-    suggestions = career_suggestions()
+    scored_matches = st.session_state.top_matches
+    suggestions = tuple(match_title(match) for match in scored_matches[:3]) or career_suggestions()
     max_score = 10 if st.session_state.personality_mode == "riasec_short" else 50
     summary_title = "Your Quick RIASEC Career Profile" if st.session_state.personality_mode == "riasec_short" else "Your RIASEC Career Profile"
     st.markdown(f"<div class='top-title'>{summary_title}</div><div class='top-subtitle'>Your strongest themes point to work environments and career families that may feel naturally engaging.</div>", unsafe_allow_html=True)
+    saved_profile = st.session_state.backend_profile or {}
+    if saved_profile.get("student_id"):
+        st.success(f"Profile saved successfully · Student ID: {saved_profile['student_id']}")
+    elif st.session_state.backend_error:
+        st.warning(f"Your on-screen summary is ready, but it was not saved to the backend. {st.session_state.backend_error}")
+    if st.session_state.score_error:
+        st.warning(f"Your local results are shown below. {st.session_state.score_error}")
     st.markdown(f"<div class='panel' style='text-align:center;max-width:780px;margin:0 auto 22px'><div class='result-code'>{code}</div><h2>{RIASEC[ranked[0]][1]} {RIASEC[ranked[0]][0]} + {RIASEC[ranked[1]][1]} {RIASEC[ranked[1]][0]}</h2><p class='muted'>Your Holland Code is a starting point for exploration, not a final decision.</p></div>", unsafe_allow_html=True)
     score_cols = st.columns(3)
     for col, type_code in zip(score_cols, ranked[:3]):
@@ -395,7 +1103,19 @@ def render_personality_results() -> None:
             name, icon, _ = RIASEC[type_code]
             st.markdown(f"<div class='panel' style='text-align:center'><div class='icon-bubble' style='margin:auto'>{icon}</div><h3>{name}</h3><div class='result-number'>{scores[type_code]}/{max_score}</div></div>", unsafe_allow_html=True)
     st.markdown("<h2 style='margin-top:28px'>Career families to explore</h2>", unsafe_allow_html=True)
-    st.markdown("<div class='match-grid'>" + "".join(f"<div class='match-card'><div class='icon-bubble'>✦</div><h3>{escape(career)}</h3><p class='muted'>Explore courses, skills, and university paths related to this direction.</p></div>" for career in suggestions) + "</div>", unsafe_allow_html=True)
+    if scored_matches:
+        cards = "".join(
+            f"<div class='match-card'><span class='match-pill'>{escape(match_score(match))}</span><div class='icon-bubble'>✦</div><h3>{escape(match_title(match))}</h3><p class='muted'>{escape(str(match.get('reason') or match.get('description') or 'A strong match based on your profile.'))}</p></div>"
+            for match in scored_matches[:3]
+        )
+    else:
+        cards = "".join(f"<div class='match-card'><div class='icon-bubble'>✦</div><h3>{escape(career)}</h3><p class='muted'>Explore courses, skills, and university paths related to this direction.</p></div>" for career in suggestions)
+    st.markdown("<div class='match-grid'>" + cards + "</div>", unsafe_allow_html=True)
+    insights = st.session_state.career_insights
+    insight_items = insights.get("insights") or insights.get("recommendations") or insights.get("key_insights") or []
+    if isinstance(insight_items, list) and insight_items:
+        st.markdown("<h2 style='margin-top:28px'>Your AI insights</h2>", unsafe_allow_html=True)
+        st.markdown("<div class='panel'>" + "".join(f"<p>✦ {escape(str(item))}</p>" for item in insight_items[:4]) + "</div>", unsafe_allow_html=True)
     if st.button("Open my dashboard  →", use_container_width=True):
         st.session_state.app_stage = "dashboard"
         st.rerun()
@@ -418,11 +1138,30 @@ def render_sidebar() -> str:
 
 def render_dashboard() -> None:
     st.markdown(f"<div class='top-title'>Hello, {escape(profile_name())} 👋</div><div class='top-subtitle'>Here is your growing career profile.</div>", unsafe_allow_html=True)
-    suggested = career_suggestions()
+    if st.session_state.backend_profile and st.session_state.backend_profile.get("student_id"):
+        st.caption(f"Profile connected · ID: {st.session_state.backend_profile['student_id']}")
+    live_careers, _ = load_careers_from_backend(careers_api_url())
+    scored_matches = st.session_state.top_matches
+    # Before RIASEC scoring, prioritise the student's discovery answers over
+    # the backend's generic catalogue order. Once scored, backend matches win.
+    local_suggestions = career_suggestions()
+    generic_backend_suggestions = tuple(career_title(career) for career in live_careers[:3])
+    suggested = (
+        tuple(match_title(match) for match in scored_matches[:3])
+        or (local_suggestions if not st.session_state.personality_complete else generic_backend_suggestions)
+        or generic_backend_suggestions
+        or local_suggestions
+    )
     score, matches, mentor = st.columns([1, 1.45, .7], gap="medium")
-    with score: st.markdown("<div class='score-panel'><h3>Career Suitability Score</h3><div class='big-score'>88%</div><b>You’re on the right path!</b><p>Keep exploring to discover more opportunities.</p></div>", unsafe_allow_html=True)
+    suitability_score = dashboard_suitability_score()
+    score_message = "Your profile is becoming clearer!" if not st.session_state.personality_complete else "Your profile has a strong direction!"
+    with score: st.markdown(f"<div class='score-panel'><h3>Career Suitability Score</h3><div class='big-score'>{suitability_score}%</div><b>{score_message}</b><p>Complete more of your profile to refine the match.</p></div>", unsafe_allow_html=True)
     with matches:
-        st.markdown("<div class='panel'><span class='accent' style='float:right'>View all →</span><h3>Top Career Matches</h3><div class='match-grid'>" + "".join(f"<div class='match-card'><span class='match-pill'>{92-index*3}%</span><div class='icon-bubble'>✦</div><h3>{escape(career)}</h3><p class='muted'>A promising direction based on your current profile.</p></div>" for index, career in enumerate(suggested)) + "</div></div>", unsafe_allow_html=True)
+        match_cards = "".join(
+            f"<div class='match-card'><span class='match-pill'>{escape(match_score(match))}</span><div class='icon-bubble'>✦</div><h3>{escape(match_title(match))}</h3><p class='muted'>{escape(str(match.get('reason') or 'A promising direction based on your profile.'))}</p></div>"
+            for match in scored_matches[:3]
+        ) if scored_matches else "".join(f"<div class='match-card'><span class='match-pill'>{92-index*3}%</span><div class='icon-bubble'>✦</div><h3>{escape(career)}</h3><p class='muted'>A promising direction based on your current profile.</p></div>" for index, career in enumerate(suggested))
+        st.markdown("<div class='panel'><span class='accent' style='float:right'>View all →</span><h3>Top Career Matches</h3><div class='match-grid'>" + match_cards + "</div></div>", unsafe_allow_html=True)
     with mentor:
         with st.container(border=True, key="ai_mentor_card"):
             st.markdown("### AI Mentor")
@@ -431,25 +1170,227 @@ def render_dashboard() -> None:
             st.markdown("**Ask your AI Mentor**")
             st.caption("Career and education guidance whenever you need it.")
             if st.button("Start a conversation", use_container_width=True): st.session_state.nav_page = "AI Mentor"; st.rerun()
+    universities = university_recommendations()
     left, right = st.columns(2, gap="medium")
-    with left: st.markdown("<div class='panel'><h3>🎓 Top Universities for You</h3><p class='muted'>IIT Bombay <span class='mint'>· Match 94%</span></p><p class='muted'>NID Ahmedabad <span class='mint'>· Match 91%</span></p><p class='muted'>Ashoka University <span class='mint'>· Match 88%</span></p></div>", unsafe_allow_html=True)
+    with left:
+        university_rows = "".join(
+            f"<p class='muted'>{escape(university['name'])} <span class='mint'>· {escape(university['field'])}</span></p>"
+            for university in universities
+        )
+        st.markdown("<div class='panel'><h3>🎓 Top Universities for You</h3>" + university_rows + "</div>", unsafe_allow_html=True)
     with right: st.markdown("<div class='panel'><h3>✧ Your Learning Roadmap</h3><p class='mint'>● Self discovery</p><p class='muted'>○ Career exploration</p><p class='muted'>○ Skill building</p><p class='muted'>○ Real-world preparation</p></div>", unsafe_allow_html=True)
-
-
-def mentor_reply(question: str) -> str:
-    career_words = ("career","job","course","college","university","skill","scholarship","internship","study","degree","subject","resume","interview","education","salary","profession")
-    if not any(word in question.lower() for word in career_words):
-        return "I’m here specifically for career and education guidance. Please ask about careers, courses, skills, universities, scholarships, or internships."
-    return "A useful next step is to compare your interests, strengths, entry requirements, and opportunities. I can help you explore relevant skills, courses, colleges, or career paths."
 
 
 def render_ai_mentor() -> None:
     st.markdown("<div class='top-title'>AI Mentor</div><div class='top-subtitle'>Career and education guidance only.</div><div class='ai-card'><h3>Ask a career-focused question</h3><p>I can help with careers, skills, courses, universities, scholarships, and internships. For unrelated topics, I’ll politely guide you back.</p></div>", unsafe_allow_html=True)
+    student_id = active_student_id()
+    if not student_id:
+        st.info("Finish the profile and RIASEC quiz to unlock saved chat history and fully personalized replies.")
+    messages: list[dict[str, object]] = []
+    if student_id:
+        messages, history_error = load_chat_history(student_id, chat_api_url())
+        if history_error:
+            st.warning(history_error)
     with st.form("mentor_form", clear_on_submit=True):
         question = st.text_input("Ask your question", placeholder="Which skills should I build for UX design?")
         asked = st.form_submit_button("Ask AI Mentor  →", use_container_width=True)
-    if asked and question.strip(): st.session_state.mentor_history.append((question.strip(), mentor_reply(question.strip())))
-    for question, answer in reversed(st.session_state.mentor_history[-5:]): st.markdown(f"<div class='panel'><b>You:</b> {escape(question)}<p class='muted'><b>Career AI:</b> {escape(answer)}</p></div>", unsafe_allow_html=True)
+    if asked and question.strip():
+        career_words = ("career", "job", "course", "college", "university", "skill", "scholarship", "internship", "study", "degree", "subject", "resume", "interview", "education", "profession")
+        is_career_question = any(word in question.lower() for word in career_words)
+        if not is_career_question:
+            reply = "I’m here to help with career and education guidance. Please ask me about careers, courses, skills, universities, scholarships, internships, or study plans."
+            error = ""
+        elif student_id:
+            with st.spinner("Career AI is thinking…"):
+                reply, error = send_chat_to_backend(student_id, question.strip())
+        else:
+            reply, error = "", "Complete your profile to save AI Mentor conversations."
+        if error:
+            st.warning(error)
+            ranked = sorted(riasec_scores(), key=riasec_scores().get, reverse=True)
+            careers = career_suggestions()[:3]
+            reply = f"Your current profile points most toward {RIASEC[ranked[0]][0]} and {RIASEC[ranked[1]][0]} work. Explore {', '.join(careers)} and build {', '.join(SKILLS_BY_THEME[ranked[0]][:2])}."
+            st.session_state.mentor_history.append({"role": "student", "message": question.strip()})
+            st.session_state.mentor_history.append({"role": "ai", "message": reply})
+        else:
+            if student_id:
+                load_chat_history.clear()
+            st.session_state.mentor_history.append({"role": "student", "message": question.strip()})
+            st.session_state.mentor_history.append({"role": "ai", "message": reply})
+        st.rerun()
+    for message in messages or st.session_state.mentor_history:
+        role = "You" if chat_message_role(message) == "student" else "Career AI"
+        st.markdown(f"<div class='panel'><b>{role}:</b> {escape(chat_message_text(message))}</div>", unsafe_allow_html=True)
+
+
+def render_explore_careers() -> None:
+    st.markdown("<div class='top-title'>Explore Careers</div><div class='top-subtitle'>Search hundreds of career paths across every major field.</div>", unsafe_allow_html=True)
+    search_col, category_col = st.columns([2, 1])
+    with search_col:
+        search_term = st.text_input("Search careers", placeholder="Try software engineer, psychologist, chef…")
+    with category_col:
+        category = st.selectbox("Career category", ("All categories", *JOB_CATALOG.keys()))
+    careers, error = load_careers_from_backend(careers_api_url())
+    if error:
+        st.caption("Showing the full built-in job catalogue. Backend careers will appear here when the API is running.")
+        careers = []
+    backend_by_name = {career_title(career): career for career in careers}
+    selected_categories = JOB_CATALOG.items() if category == "All categories" else ((category, JOB_CATALOG[category]),)
+    all_jobs_with_category = [(job, group) for group, jobs in selected_categories for job in jobs]
+    query = search_term.strip().lower()
+    filtered = [(job, group) for job, group in all_jobs_with_category if not query or query in job.lower()]
+    st.caption(f"{len(filtered)} career paths found")
+    if not filtered:
+        st.info("No careers match that search. Try a broader word or choose All categories.")
+        return
+    cards = []
+    for job, group in filtered:
+        backend_job = backend_by_name.get(job, {})
+        description = career_description(backend_job) if backend_job else f"{group} · Explore required skills, courses, and opportunities."
+        cards.append(
+            f"<div class='match-card'><span class='match-pill'>{escape(group)}</span><div class='icon-bubble'>✦</div>"
+            f"<h3>{escape(job)}</h3><p class='muted'>{escape(description)}</p></div>"
+        )
+    st.markdown("<div class='match-grid'>" + "".join(cards) + "</div>", unsafe_allow_html=True)
+
+
+def render_skill_roadmap() -> None:
+    st.markdown("<div class='top-title'>Your Learning Roadmap</div><div class='top-subtitle'>Track each career-preparation step as you complete it.</div>", unsafe_allow_html=True)
+    student_id = active_student_id()
+    steps: list[dict[str, object]] = []
+    error = ""
+    if student_id:
+        steps, error = load_roadmap(student_id, roadmap_api_url())
+    if error:
+        st.warning(f"{error} Showing a roadmap based on your quiz results.")
+    if not steps:
+        steps = list(personalized_roadmap_steps())
+        if not student_id:
+            st.info("Finish the quiz to save this personalized roadmap to your account.")
+    using_local_steps = not student_id or bool(error) or not load_roadmap(student_id, roadmap_api_url())[0]
+    if using_local_steps:
+        for step in steps:
+            step_id = roadmap_step_id(step)
+            if step_id is not None:
+                step["completed"] = step_id in st.session_state.local_roadmap_completed
+    completed_count = sum(bool(step.get("completed", False)) for step in steps)
+    progress = round(completed_count * 100 / len(steps))
+    st.markdown(f"<div class='panel'><h3>{progress}% complete</h3><div class='progress-shell'><div class='progress-fill' style='width:{progress}%'></div></div><p class='muted'>{completed_count} of {len(steps)} steps completed</p></div>", unsafe_allow_html=True)
+    for position, step in enumerate(steps, 1):
+        step_id = roadmap_step_id(step)
+        title = roadmap_step_title(step, position)
+        description = str(step.get("description") or step.get("details") or "")
+        completed = bool(step.get("completed", False))
+        row, check = st.columns([5, 1])
+        with row:
+            state = "Completed" if completed else "In progress"
+            st.markdown(f"<div class='panel'><h3>{position}. {escape(title)}</h3><p class='muted'>{escape(description) if description else state}</p></div>", unsafe_allow_html=True)
+        with check:
+            st.markdown("<div style='height:18px'></div>", unsafe_allow_html=True)
+            if step_id is None:
+                st.caption("Missing step ID")
+            elif using_local_steps:
+                if st.button("✓ Done" if not completed else "↩ Undo", key=f"roadmap_step_{step_id}", use_container_width=True):
+                    if completed:
+                        st.session_state.local_roadmap_completed.discard(step_id)
+                    else:
+                        st.session_state.local_roadmap_completed.add(step_id)
+                    st.rerun()
+            elif st.button("✓ Done" if not completed else "↩ Undo", key=f"roadmap_step_{step_id}", use_container_width=True):
+                update_error = update_roadmap_step(student_id, step_id, not completed)
+                if update_error:
+                    st.error(update_error)
+                else:
+                    load_roadmap.clear()
+                    st.rerun()
+
+
+def render_universities() -> None:
+    st.markdown("<div class='top-title'>Universities Worldwide</div><div class='top-subtitle'>Browse the curated study-path recommendations or search the wider global higher-education directory.</div>", unsafe_allow_html=True)
+    source = st.radio(
+        "University source",
+        ("Curated recommendations", "Worldwide directory"),
+        horizontal=True,
+        label_visibility="collapsed",
+    )
+    if source == "Worldwide directory":
+        st.markdown("<div class='panel'><h3>🌍 Search worldwide institutions</h3><p class='muted'>Search a broad international directory of universities and higher-education institutions. Results are directory listings from OpenAlex—not rankings or application advice.</p></div>", unsafe_allow_html=True)
+        search_col, country_col = st.columns([2, 1])
+        with search_col:
+            global_query = st.text_input("Search worldwide universities", placeholder="Try engineering, university, design, MIT…", key="global_university_query")
+        with country_col:
+            country = st.selectbox("Country", ("All countries", *GLOBAL_UNIVERSITY_COUNTRIES), key="global_university_country")
+        if not global_query.strip() and country == "All countries":
+            st.info("Enter a university name/subject or select a country to search the worldwide directory.")
+            return
+        with st.spinner("Searching worldwide institutions…"):
+            global_results = search_worldwide_universities(global_query, country)
+        if not global_results:
+            st.warning("No directory results were returned. Check your internet connection or try a broader search.")
+            return
+        st.caption(f"{len(global_results)} institutions found. Use each university’s official website to verify courses, fees, accreditation, admissions, and scholarships.")
+        cards = "".join(
+            f"<div class='match-card'><span class='match-pill'>{escape(item['country'])}</span><div class='icon-bubble'>🎓</div>"
+            f"<h3>{escape(item['name'])}</h3><p class='muted'>{escape(item['city']) or 'Location not listed'}"
+            + (f"<br><span class='mint'>{escape(item['website'])}</span>" if item['website'] else "")
+            + "</p></div>"
+            for item in global_results
+        )
+        st.markdown("<div class='match-grid'>" + cards + "</div>", unsafe_allow_html=True)
+        return
+    recommended = university_recommendations()
+    recommended_cards = "".join(
+        f"<div class='match-card'><span class='match-pill'>For you</span><div class='icon-bubble'>🎓</div>"
+        f"<h3>{escape(university['name'])}</h3><p class='muted'><b>{escape(university['field'])}</b><br>{escape(university['country'])}<br><span class='mint'>{escape(university['scholarships'])}</span></p></div>"
+        for university in recommended
+    )
+    st.markdown(
+        "<div class='panel'><h3>✨ Recommended for you</h3><p class='muted'>"
+        + escape(university_recommendation_reason())
+        + "</p><div class='match-grid'>" + recommended_cards + "</div></div>",
+        unsafe_allow_html=True,
+    )
+    st.markdown("<h2 style='margin-top:28px'>Browse all curated universities</h2>", unsafe_allow_html=True)
+    fields = tuple(sorted({university["field"] for university in UNIVERSITY_CATALOG}))
+    search_col, field_col = st.columns([2, 1])
+    with search_col:
+        query = st.text_input("Search universities", placeholder="Try MIT, IIT, design, medicine…").strip().lower()
+    with field_col:
+        field = st.selectbox("Study field", ("All fields", *fields))
+    filtered = [
+        university for university in UNIVERSITY_CATALOG
+        if (field == "All fields" or university["field"] == field)
+        and (not query or query in " ".join(university.values()).lower())
+    ]
+    st.caption(f"{len(filtered)} university recommendations found · Rankings are snapshots—check current rankings before applying.")
+    if not filtered:
+        st.info("No universities match that search.")
+        return
+    cards = "".join(
+        f"<div class='match-card'><span class='match-pill'>{escape(university['country'])}</span><div class='icon-bubble'>🎓</div>"
+        f"<h3>{escape(university['name'])}</h3><p class='muted'><b>{escape(university['field'])}</b><br>{escape(university['reputation'])}<br><span class='mint'>{escape(university['scholarships'])}</span></p></div>"
+        for university in filtered
+    )
+    st.markdown("<div class='match-grid'>" + cards + "</div>", unsafe_allow_html=True)
+
+
+def render_scholarships() -> None:
+    st.markdown("<div class='top-title'>Scholarships</div><div class='top-subtitle'>Major funding opportunities for Indian students and international study pathways.</div>", unsafe_allow_html=True)
+    query = st.text_input("Search scholarships", placeholder="Try UK, STEM, master's, India…").strip().lower()
+    filtered = [
+        scholarship for scholarship in SCHOLARSHIP_CATALOG
+        if not query or query in " ".join(scholarship.values()).lower()
+    ]
+    st.caption(f"{len(filtered)} scholarships found · Always confirm current eligibility and deadlines on the official provider website.")
+    if not filtered:
+        st.info("No scholarships match that search.")
+        return
+    cards = "".join(
+        f"<div class='match-card'><div class='icon-bubble'>✦</div><h3>{escape(item['name'])}</h3>"
+        f"<p class='muted'><b>Funded by:</b> {escape(item['funded_by'])}<br><b>Coverage:</b> {escape(item['coverage'])}<br><span class='mint'>{escape(item['best_for'])}</span></p></div>"
+        for item in filtered
+    )
+    st.markdown("<div class='match-grid'>" + cards + "</div>", unsafe_allow_html=True)
 
 
 def render_simple_page(page: str) -> None:
@@ -464,6 +1405,10 @@ def render_app() -> None:
     render_theme_toggle()
     page = render_sidebar()
     if page == "Dashboard": render_dashboard()
+    elif page == "Explore Careers": render_explore_careers()
+    elif page == "Skill Roadmap": render_skill_roadmap()
+    elif page == "Universities": render_universities()
+    elif page == "Scholarships": render_scholarships()
     elif page == "AI Mentor": render_ai_mentor()
     else: render_simple_page(page)
 
