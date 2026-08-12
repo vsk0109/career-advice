@@ -1,0 +1,89 @@
+"""
+Thin requests-based client for the FastAPI backend. All calls that need
+auth pull the JWT from st.session_state (set by login/signup) and attach it
+as a Bearer token — this module is the only place that talks HTTP.
+"""
+
+import os
+
+import requests
+import streamlit as st
+from dotenv import load_dotenv
+
+load_dotenv()
+
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+
+
+class APIError(Exception):
+    def __init__(self, status_code: int, detail: str):
+        self.status_code = status_code
+        self.detail = detail
+        super().__init__(detail)
+
+
+def _auth_headers() -> dict:
+    token = st.session_state.get("access_token")
+    return {"Authorization": f"Bearer {token}"} if token else {}
+
+
+def _handle(resp: requests.Response):
+    if resp.status_code >= 400:
+        try:
+            detail = resp.json().get("detail", resp.text)
+        except ValueError:
+            detail = resp.text
+        raise APIError(resp.status_code, detail)
+    return resp.json()
+
+
+def signup(name: str, email: str, password: str) -> dict:
+    resp = requests.post(f"{API_BASE_URL}/auth/signup", json={"name": name, "email": email, "password": password})
+    return _handle(resp)
+
+
+def login(email: str, password: str) -> dict:
+    resp = requests.post(f"{API_BASE_URL}/auth/login", json={"email": email, "password": password})
+    return _handle(resp)
+
+
+def get_profile() -> dict:
+    return _handle(requests.get(f"{API_BASE_URL}/profile", headers=_auth_headers()))
+
+
+def submit_profile(payload: dict) -> dict:
+    return _handle(requests.post(f"{API_BASE_URL}/profile", json=payload, headers=_auth_headers()))
+
+
+def get_careers() -> list:
+    return _handle(requests.get(f"{API_BASE_URL}/careers"))
+
+
+def get_score() -> dict:
+    return _handle(requests.post(f"{API_BASE_URL}/score", headers=_auth_headers()))
+
+
+def get_insights(top_matches: list) -> dict:
+    return _handle(requests.post(
+        f"{API_BASE_URL}/score/insights", json={"top_matches": top_matches}, headers=_auth_headers()
+    ))
+
+
+def get_roadmap() -> dict:
+    return _handle(requests.get(f"{API_BASE_URL}/roadmap", headers=_auth_headers()))
+
+
+def update_roadmap_step(step_id: int, completed: bool) -> dict:
+    return _handle(requests.patch(
+        f"{API_BASE_URL}/roadmap/steps/{step_id}", json={"completed": completed}, headers=_auth_headers()
+    ))
+
+
+def get_chat_history() -> dict:
+    return _handle(requests.get(f"{API_BASE_URL}/mentor/chat", headers=_auth_headers()))
+
+
+def send_chat_message(message: str) -> dict:
+    return _handle(requests.post(
+        f"{API_BASE_URL}/mentor/chat", json={"message": message}, headers=_auth_headers()
+    ))

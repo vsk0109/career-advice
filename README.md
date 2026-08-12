@@ -11,7 +11,7 @@ Collects a student's interests, personality (RIASEC), academics, hobbies, and se
 ```
 career-advice/
 ├── backend/     FastAPI backend — see backend/README.md
-├── frontend/    React frontend — see frontend/SETUP.md
+├── frontend/    Streamlit frontend — see frontend/SETUP.md
 └── docs/        Design docs: architecture, data model, scoring algorithm, API spec, project plan
 ```
 
@@ -25,15 +25,17 @@ pip install -r requirements.txt
 cp .env.example .env
 uvicorn app.main:app --reload
 ```
-Runs at http://localhost:8000 (docs at `/docs`).
+Runs at http://localhost:8000 (docs at `/docs`). Requires a running local MySQL server.
 
-**Frontend:** see `frontend/SETUP.md` for the one-time Vite scaffold step, then:
+**Frontend:**
 ```bash
 cd frontend
-npm install
-npm run dev
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+streamlit run app.py
 ```
-Runs at http://localhost:5173.
+Runs at http://localhost:8501.
 
 ## Docs
 

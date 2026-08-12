@@ -1,60 +1,41 @@
 # Frontend Setup
 
-This folder is a placeholder — the actual React app needs to be scaffolded locally with `npm` (needs to run on your machine, not something that can be pre-built as static files).
+Streamlit app that talks to the FastAPI backend over HTTP (with a JWT from
+login/signup attached as a Bearer token). Python-only — no npm/Vite step.
 
-## First-time setup (whoever owns frontend — D Vaishnavi)
-
-From the `career-advice/` repo root:
+## Setup
 
 ```bash
 cd frontend
-npm create vite@latest . -- --template react
-npm install
-npm install axios recharts react-router-dom
+python3 -m venv venv && source venv/bin/activate   # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env    # set API_BASE_URL if the backend isn't on localhost:8000
 ```
 
-When prompted "Current directory is not empty, remove existing files and continue?", say yes (it'll only remove this placeholder setup — just make sure `.env.example` is re-added after, or copy it back in from git history).
-
-Copy `.env.example` to `.env` and set:
-```
-VITE_API_BASE_URL=http://localhost:8000
-```
-
-## Run dev server
+## Run
 
 ```bash
-npm run dev
+streamlit run app.py
 ```
 
-Runs on `http://localhost:5173` by default — this matches the CORS origin already whitelisted in `backend/app/main.py`.
+Runs on `http://localhost:8501` by default. Requires the backend
+(`cd ../backend && uvicorn app.main:app --reload`) running and its MySQL
+database up — see `../backend/README.md`.
 
-## Suggested page structure
+## Pages
 
 ```
-src/
-  main.jsx
-  App.jsx
-  api/
-    client.js          # axios instance using VITE_API_BASE_URL
-  pages/
-    Landing.jsx
-    Intake.jsx           # multi-step form: interests, RIASEC quiz, academics, hobbies, skills
-    Dashboard.jsx
-    Mentor.jsx             # chat UI
-  components/
-    RiasecRadarChart.jsx
-    CareerCard.jsx
-    SkillGapChecklist.jsx
-    ProgressTracker.jsx
+app.py           # everything: styles, auth, assessment, dashboard, roadmap, mentor chat
+api_client.py     # thin requests wrapper around the backend, attaches the JWT from st.session_state
 ```
 
-## API calls this needs to make
+- **Log in / Sign up** — calls `POST /auth/login` or `POST /auth/signup`, stores the returned JWT in `st.session_state`.
+- **Assessment** — RIASEC quiz (12 sliders), academics, self-rated skills, interests/hobbies → `POST /profile`. Shown automatically until the student has a saved RIASEC profile.
+- **Dashboard** — `POST /score` for ranked matches, `POST /score/insights` (on demand, since it calls the LLM) for explanations + roadmap.
+- **Roadmap** — `GET /roadmap` + `PATCH /roadmap/steps/{step_id}` checkboxes.
+- **Mentor** — `GET`/`POST /mentor/chat`, rendered with `st.chat_message`.
 
-See `../docs/04_API_SPEC.md` for full request/response shapes. Summary:
-
-1. `POST /profile` — submit intake form → get back `student_id` + computed RIASEC scores
-2. `POST /score` — get ranked career matches for `student_id`
-3. `POST /score/insights` — get LLM explanations + roadmap for the top matches
-4. `POST /mentor/chat` — send chat messages
-
-Store `student_id` in React state (or localStorage) after intake so it can be reused across the Dashboard and Mentor pages.
+The RIASEC questions and the subject/skill/interest vocabulary in `app.py`
+must match `backend/app/data/riasec_questions.py` and `careers_seed.json` —
+that's what the scoring engine actually matches against. If either changes
+on the backend, update the corresponding lists in `app.py`.

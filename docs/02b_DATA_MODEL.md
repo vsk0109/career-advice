@@ -12,12 +12,21 @@ stateful features (chat history, roadmap progress tracking).
 |---|---|---|
 | student_id | INT, PK, AUTO_INCREMENT | |
 | name | VARCHAR(150) | |
+| email | VARCHAR(255), UNIQUE | identity for login; account created by `/auth/signup` |
+| password_hash | VARCHAR(255) | bcrypt hash, never returned by any endpoint |
 | interests | JSON | `["technology", "design"]` |
 | hobbies | JSON | `["reading", "coding"]` |
 | riasec_scores | JSON | `{"R": 3, "I": 8, "A": 5, "S": 2, "E": 4, "C": 6}` — computed server-side from quiz answers |
 | academics | JSON | `{"Math": 85, "Physics": 78, "English": 65}` |
 | self_rated_skills | JSON | `{"communication": 4, "coding": 5}` (1-5 scale) |
 | created_at | TIMESTAMP | |
+
+`email`/`password_hash` are nullable at the DB level (existing rows predate
+these columns) but required by `/auth/signup` — enforced at the API
+boundary, not the schema, so the migration adding them didn't require
+dropping existing dev databases. `interests`/`hobbies`/`riasec_scores`/
+`academics`/`self_rated_skills` start empty (`[]`/`{}`) at signup and are
+filled in by `POST /profile`.
 
 ## `careers`
 | Column | Type | Notes |
@@ -59,7 +68,7 @@ into the LLM prompt as context on each new message.
 | career | VARCHAR(150) | career name the roadmap is for (not a FK — matches `careers.name`, not `careers.id`) |
 | step_number | INT | 1-indexed order |
 | description | TEXT | e.g. "Step 1: Strengthen your foundation in..." |
-| completed | BOOLEAN | toggled via `PATCH /roadmap/{student_id}/steps/{step_id}` |
+| completed | BOOLEAN | toggled via `PATCH /roadmap/steps/{step_id}` |
 | created_at | TIMESTAMP | |
 
 Populated by `POST /score/insights` for the top-matched career; each call

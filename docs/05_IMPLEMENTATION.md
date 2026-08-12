@@ -29,7 +29,7 @@ EXISTS`, safe to re-run):
 
 | Table | Purpose | Key columns |
 |---|---|---|
-| `students` | One row per profile | `interests`, `hobbies`, `riasec_scores`, `academics`, `self_rated_skills` — all JSON |
+| `students` | One row per student, created at signup | `email`, `password_hash` (bcrypt); `interests`, `hobbies`, `riasec_scores`, `academics`, `self_rated_skills` — all JSON, start empty |
 | `careers` | One row per career, seeded from `careers_seed.json` | `riasec_tags`, `courses`, `colleges`, `scholarships`, `certifications` — all JSON; `emerging` boolean |
 | `mentor_chat` | Full chat history | `student_id` FK, `sender` (`student`/`ai`), `message`, `created_at` |
 | `roadmap_steps` | Roadmap progress tracking | `student_id` FK, `career`, `step_number`, `description`, `completed` |
@@ -38,26 +38,46 @@ Full column-level detail: `02b_DATA_MODEL.md`.
 
 `app/services/db.py` is the *only* module that imports `pymysql`. Routers
 and `scoring_engine.py` only ever call its plain-dict functions
-(`save_profile`, `get_profile`, `get_all_careers`, `save_chat_message`,
-`get_chat_history`, `save_roadmap`, `get_roadmap`, `update_roadmap_step`) —
-the storage layer could change again without touching either.
+(`create_account`, `get_student_auth_by_email`, `update_profile`,
+`get_profile`, `get_all_careers`, `save_chat_message`, `get_chat_history`,
+`save_roadmap`, `get_roadmap`, `update_roadmap_step`) — the storage layer
+could change again without touching either.
+
+## Auth
+
+`app/services/auth.py` handles password hashing (bcrypt) and JWT
+issuing/verification (PyJWT, HS256, secret from `JWT_SECRET`). Every
+protected route depends on `get_current_student_id` — a FastAPI dependency
+that reads the `Authorization: Bearer <token>` header, decodes it, and
+returns the student_id from the token's `sub` claim (401 if missing,
+malformed, or expired). No endpoint accepts `student_id` from the client —
+identity comes entirely from the token, which is also why `/profile`,
+`/score`, `/mentor/chat`, and `/roadmap` dropped `student_id` from their
+request bodies/paths compared to earlier versions of this API.
 
 ## End-to-end request flow
 
 ```
+0. Signup / Login          POST /auth/signup  { name, email, password }
+                            POST /auth/login   { email, password }
+   ─────────────────────────────────────────────────────────────
+   Signup hashes the password (bcrypt) and creates a `students` row with
+   empty profile fields ([] / {}). Login looks up by email and verifies
+   the hash. Both return a JWT (access_token) the client attaches as
+   `Authorization: Bearer <token>` on every subsequent request.
+
 1. Intake                POST /profile
    ─────────────────────────────────────────────────────────────
-   Client sends: name, interests, hobbies, raw riasec_answers,
-   academics, self_rated_skills.
+   Client sends: interests, hobbies, raw riasec_answers, academics,
+   self_rated_skills (name/email already set at signup, not resent here).
    Server computes riasec_scores from riasec_answers server-side
    (never trusts client-computed scores) via
-   scoring_engine.compute_riasec_scores(), inserts one row into
-   `students`, returns student_id (MySQL AUTO_INCREMENT int, sent
-   back as a string).
+   scoring_engine.compute_riasec_scores(), UPDATEs the students row
+   identified by the token's student_id.
 
-2. Deterministic ranking  POST /score  { student_id }
+2. Deterministic ranking  POST /score
    ─────────────────────────────────────────────────────────────
-   Loads the profile row + all of `careers`. scoring_engine.rank_careers()
+   Loads the profile row (via token) + all of `careers`. scoring_engine.rank_careers()
    computes, per career:
      - riasec_match   = cosine similarity of RIASEC vectors, 0-100
      - academic_fit   = avg marks in the career's relevant_subjects
@@ -68,7 +88,7 @@ the storage layer could change again without touching either.
    top 5 sorted by score. No LLM call — fast, deterministic, unit-testable
    in isolation (scoring_engine.py has zero FastAPI/DB imports).
 
-3. AI-generated insights   POST /score/insights  { student_id, top_matches }
+3. AI-generated insights   POST /score/insights  { top_matches }
    ─────────────────────────────────────────────────────────────
    Sends profile + top_matches to whichever LLM is configured
    (llm_client.py: Gemini / OpenAI / local Ollama) for a 2-sentence
@@ -80,15 +100,15 @@ the storage layer could change again without touching either.
    prior roadmap for that student+career pair and inserts the fresh one,
    so regenerating insights doesn't accumulate duplicate roadmaps.
 
-4. Roadmap progress        GET /roadmap/{student_id}
-                            PATCH /roadmap/{student_id}/steps/{step_id}
+4. Roadmap progress        GET /roadmap
+                            PATCH /roadmap/steps/{step_id}
    ─────────────────────────────────────────────────────────────
    Independent of scoring — reads/writes `roadmap_steps` directly.
    Lets the student check off steps across visits without re-running
    the scoring or LLM pipeline.
 
-5. Mentor chat              POST /mentor/chat  { student_id, message }
-                             GET /mentor/chat/{student_id}
+5. Mentor chat              POST /mentor/chat  { message }
+                             GET /mentor/chat
    ─────────────────────────────────────────────────────────────
    Saves the student's message to `mentor_chat` first, then fetches the
    full history and passes the last 6 turns back into the LLM prompt as
@@ -97,20 +117,42 @@ the storage layer could change again without touching either.
    LLM call returns a canned reply instead of failing the request.
 ```
 
+## Frontend
+
+Streamlit (`frontend/app.py`), not the originally-planned React/Vite app —
+Python-only end to end, faster to build for this project's scope. It's a
+plain HTTP client of the backend (`frontend/api_client.py` wraps `requests`
+calls, attaching the JWT from `st.session_state`); no direct DB or LLM
+access from the frontend. Pages: auth (login/signup tabs), assessment
+(intake form), dashboard (score + on-demand AI insights), roadmap
+(checkboxes), mentor (chat). The RIASEC questions and subject/skill/interest
+vocabulary in `app.py` are hardcoded to match `riasec_questions.py` and
+`careers_seed.json` — if either changes on the backend, the frontend lists
+need updating too (no shared source of truth between them currently).
+
 ## Local dev
 
 ```bash
+# backend
 cd backend
 python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # fill in MYSQL_* — defaults assume localhost/root
+cp .env.example .env   # fill in MYSQL_* and JWT_SECRET — defaults assume localhost/root
 uvicorn app.main:app --reload
+
+# frontend (separate terminal)
+cd frontend
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+streamlit run app.py
 ```
 
 Requires a running local MySQL server. `init_db()` on startup:
 1. `CREATE DATABASE IF NOT EXISTS` the configured database name.
 2. Runs every `CREATE TABLE IF NOT EXISTS` in `schema.sql`.
 3. If `careers` is empty, seeds it from `app/data/careers_seed.json`.
+4. Migrates `students` to add `email`/`password_hash` if the table predates them.
 
 No manual migration step, no seed script to remember to run.
 
@@ -125,10 +167,10 @@ No manual migration step, no seed script to remember to run.
   for it become orphaned from the new row. Not an issue at current scale
   (careers are added, not renamed), but worth fixing with a proper FK if
   the dataset starts churning.
-- No auth — `student_id` is the only "session" concept, and anyone who
-  knows a valid ID can read/modify that student's profile, chat, and
-  roadmap. Acceptable for a local/demo build; would need real auth before
-  any public deployment.
+- JWTs can't be revoked before they expire (`JWT_EXPIRE_MINUTES`, default
+  24h) — there's no server-side session/blocklist, so "logout" only clears
+  the token client-side. Acceptable for a demo; a real deployment would
+  want short-lived access tokens + refresh tokens, or a revocation list.
 - `careers.riasec_tags` are hand-assigned during data curation (see
   `03_SCORING_ALGORITHM.md`), not derived from labor-market data — a
   reasonable simplification for a curated ~30-career dataset, but worth
