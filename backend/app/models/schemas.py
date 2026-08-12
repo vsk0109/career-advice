@@ -2,11 +2,30 @@ from pydantic import BaseModel, Field
 from typing import Optional
 
 
+# ---------- Auth ----------
+
+class SignupRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class AuthResponse(BaseModel):
+    student_id: str
+    name: str
+    email: str
+    access_token: str
+    token_type: str = "bearer"
+
+
 # ---------- Profile ----------
 
 class ProfileIntake(BaseModel):
-    name: str
-    email: str
     interests: list[str] = Field(default_factory=list)
     hobbies: list[str] = Field(default_factory=list)
     riasec_answers: list[int] = Field(
@@ -74,10 +93,6 @@ class Career(BaseModel):
 
 # ---------- Score ----------
 
-class ScoreRequest(BaseModel):
-    student_id: str
-
-
 class CareerMatch(BaseModel):
     career: str
     score: float
@@ -97,7 +112,6 @@ class ScoreResponse(BaseModel):
 
 
 class InsightsRequest(BaseModel):
-    student_id: str
     top_matches: list[CareerMatch]
 
 
@@ -110,7 +124,6 @@ class InsightsResponse(BaseModel):
 # ---------- Mentor Chat ----------
 
 class ChatRequest(BaseModel):
-    student_id: str
     message: str
 
 

@@ -1,13 +1,16 @@
 """
 Data access layer — MySQL-backed.
 
-Two tables (see database/schema.sql):
-  students — one row per profile, list/dict fields stored as JSON columns.
-             Uniquely identified by email; save_profile upserts on it.
-  careers  — one row per career, auto-seeded from data/careers_seed.json.
+Tables (see database/schema.sql):
+  students     — one row per student, created by /auth/signup and uniquely
+                 identified by email. Profile fields (interests, hobbies,
+                 riasec_scores, academics, self_rated_skills) start empty
+                 and are filled in later via update_profile.
+  careers      — one row per career, auto-seeded from data/careers_seed.json.
+  mentor_chat  — chat history, one row per message.
+  roadmap_steps — roadmap steps generated per student+career.
 
-Function signatures (save_profile, get_profile, get_all_careers) are the
-contract the routers depend on.
+Function signatures are the contract routers depend on.
 """
 
 import json
@@ -73,19 +76,20 @@ def init_db():
         if cur.fetchone()["n"] == 0:
             _seed_careers(cur)
 
-        _add_students_email_column_if_missing(cur)
+        _ensure_column(cur, "students", "email", "VARCHAR(255) UNIQUE AFTER name")
+        _ensure_column(cur, "students", "password_hash", "VARCHAR(255) AFTER email")
 
 
-def _add_students_email_column_if_missing(cur):
-    """Migrate DBs created before the email column existed (schema.sql's
+def _ensure_column(cur, table: str, column: str, ddl_fragment: str):
+    """Migrate tables created before this column existed (schema.sql's
     CREATE TABLE IF NOT EXISTS won't add it to an already-existing table)."""
     cur.execute(
         "SELECT COUNT(*) AS n FROM information_schema.columns "
-        "WHERE table_schema = %s AND table_name = 'students' AND column_name = 'email'",
-        (DB_NAME,),
+        "WHERE table_schema = %s AND table_name = %s AND column_name = %s",
+        (DB_NAME, table, column),
     )
     if cur.fetchone()["n"] == 0:
-        cur.execute("ALTER TABLE students ADD COLUMN email VARCHAR(255) UNIQUE AFTER name")
+        cur.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl_fragment}")
 
 
 def _seed_careers(cur):
@@ -130,53 +134,53 @@ def get_all_careers() -> list[dict]:
     return rows
 
 
-def save_profile(profile_data: dict) -> str:
-    """Upsert by email — a returning student (same email) updates their
-    existing row instead of getting a new student_id and orphaning their
-    prior chat history / roadmap."""
-    email = profile_data["email"]
-
+def create_account(name: str, email: str, password_hash: str) -> str:
+    """Signup: creates the student row with empty profile fields, filled in
+    later via update_profile once the student completes the intake form."""
     with get_connection() as conn, conn.cursor() as cur:
-        cur.execute("SELECT student_id FROM students WHERE email = %s", (email,))
-        existing = cur.fetchone()
-
-        if existing:
-            student_id = existing["student_id"]
-            cur.execute(
-                """
-                UPDATE students
-                SET name = %s, interests = %s, hobbies = %s, riasec_scores = %s,
-                    academics = %s, self_rated_skills = %s
-                WHERE student_id = %s
-                """,
-                (
-                    profile_data["name"],
-                    json.dumps(profile_data["interests"]),
-                    json.dumps(profile_data["hobbies"]),
-                    json.dumps(profile_data["riasec_scores"]),
-                    json.dumps(profile_data["academics"]),
-                    json.dumps(profile_data["self_rated_skills"]),
-                    student_id,
-                ),
-            )
-            return str(student_id)
-
         cur.execute(
             """
-            INSERT INTO students (name, email, interests, hobbies, riasec_scores, academics, self_rated_skills)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO students (name, email, password_hash, interests, hobbies,
+                                   riasec_scores, academics, self_rated_skills)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """,
-            (
-                profile_data["name"],
-                email,
-                json.dumps(profile_data["interests"]),
-                json.dumps(profile_data["hobbies"]),
-                json.dumps(profile_data["riasec_scores"]),
-                json.dumps(profile_data["academics"]),
-                json.dumps(profile_data["self_rated_skills"]),
-            ),
+            (name, email, password_hash, "[]", "[]", "{}", "{}", "{}"),
         )
         return str(cur.lastrowid)
+
+
+def get_student_auth_by_email(email: str) -> dict | None:
+    """Returns {student_id, name, email, password_hash} for login, or None."""
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT student_id, name, email, password_hash FROM students WHERE email = %s",
+            (email,),
+        )
+        return cur.fetchone()
+
+
+def update_profile(student_id: str, profile_fields: dict) -> None:
+    """Overwrites the intake fields for an existing student (created at signup)."""
+    numeric_id = _to_int(student_id)
+    if numeric_id is None:
+        return
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE students
+            SET interests = %s, hobbies = %s, riasec_scores = %s,
+                academics = %s, self_rated_skills = %s
+            WHERE student_id = %s
+            """,
+            (
+                json.dumps(profile_fields["interests"]),
+                json.dumps(profile_fields["hobbies"]),
+                json.dumps(profile_fields["riasec_scores"]),
+                json.dumps(profile_fields["academics"]),
+                json.dumps(profile_fields["self_rated_skills"]),
+                numeric_id,
+            ),
+        )
 
 
 def _to_int(student_id: str) -> int | None:
@@ -200,6 +204,7 @@ def get_profile(student_id: str) -> dict | None:
 
     row.pop("student_id", None)
     row.pop("created_at", None)
+    row.pop("password_hash", None)
     return _parse_json_fields(row, _JSON_STUDENT_FIELDS)
 
 
