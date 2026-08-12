@@ -27,7 +27,9 @@ def inject_styles() -> None:
         :root { --bg:#0d0820; --panel:#1a1037; --panel2:#28194e; --line:rgba(196,165,255,.22); --muted:#c0b5d8; --violet:#9664ff; --pink:#ef5e7d; --mint:#70e1ba; }
         * { font-family:'DM Sans', sans-serif; }
         .stApp { background:radial-gradient(circle at 78% 5%, #34206c 0, #170b31 37%, var(--bg) 100%); color:#faf8ff; }
-        #MainMenu, footer, header { visibility:hidden; }
+        #MainMenu, footer { visibility:hidden; }
+        header { background:transparent; }
+        [data-testid='stHeader'] { background:transparent; }
         [data-testid='stAppViewContainer'] > .main { background:transparent; }
         .block-container { max-width:1400px; padding-top:2.2rem; padding-bottom:3rem; }
         [data-testid='stSidebar'] { background:#0b061c; border-right:1px solid var(--line); }
@@ -110,6 +112,7 @@ def init_state() -> None:
     defaults = {
         "access_token": None, "student_id": None, "name": None, "email": None,
         "nav_page": "Dashboard", "profile": None, "score": None, "insights": None,
+        "insights_checked": False,
     }
     for key, value in defaults.items():
         st.session_state.setdefault(key, value)
@@ -125,7 +128,7 @@ def has_completed_profile() -> bool:
 
 
 def logout() -> None:
-    for key in ("access_token", "student_id", "name", "email", "profile", "score", "insights"):
+    for key in ("access_token", "student_id", "name", "email", "profile", "score", "insights", "insights_checked"):
         st.session_state.pop(key, None)
     st.rerun()
 
@@ -217,6 +220,10 @@ def _apply_auth_result(result: dict) -> None:
 
 def render_assessment() -> None:
     title("Let's get to know you", "Your answers drive your career matches — you can retake this anytime.")
+    profile = st.session_state.profile or {}
+    saved_answers = profile.get("riasec_answers") or []
+    saved_academics = profile.get("academics") or {}
+    saved_skills = profile.get("self_rated_skills") or {}
 
     with st.form("assessment_form"):
         st.markdown("<div class='card'><h3>🧭 Personality (RIASEC)</h3>"
@@ -225,8 +232,9 @@ def render_assessment() -> None:
         riasec_answers = []
         cols = st.columns(2)
         for i, (statement, _dim) in enumerate(RIASEC_QUESTIONS):
+            default = saved_answers[i] if i < len(saved_answers) else 3
             with cols[i % 2]:
-                riasec_answers.append(st.slider(statement, 1, 5, 3, key=f"riasec_{i}"))
+                riasec_answers.append(st.slider(statement, 1, 5, default, key=f"riasec_{i}"))
 
         st.markdown("<div class='card'><h3>📚 Academics</h3>"
                      "<p class='muted'>Enter marks (0-100) only for subjects you've taken — leave others at 0.</p></div>",
@@ -235,7 +243,8 @@ def render_assessment() -> None:
         cols = st.columns(3)
         for i, subject in enumerate(SUBJECTS):
             with cols[i % 3]:
-                mark = st.number_input(subject, min_value=0, max_value=100, value=0, step=1, key=f"academic_{subject}")
+                mark = st.number_input(subject, min_value=0, max_value=100,
+                                        value=int(saved_academics.get(subject, 0)), step=1, key=f"academic_{subject}")
                 if mark > 0:
                     academics[subject] = mark
 
@@ -246,13 +255,15 @@ def render_assessment() -> None:
         cols = st.columns(4)
         for i, skill in enumerate(SKILLS):
             with cols[i % 4]:
-                level = st.slider(skill, 0, 5, 0, key=f"skill_{skill}")
+                level = st.slider(skill, 0, 5, int(saved_skills.get(skill, 0)), key=f"skill_{skill}")
                 if level > 0:
                     self_rated_skills[skill] = level
 
         st.markdown("<div class='card'><h3>💡 Interests &amp; hobbies</h3></div>", unsafe_allow_html=True)
-        interests = st.multiselect("Interests", INTEREST_TAGS, key="interests")
-        hobbies_raw = st.text_input("Hobbies (comma-separated)", placeholder="e.g. reading, chess, painting", key="hobbies")
+        interests = st.multiselect("Interests", INTEREST_TAGS, default=profile.get("interests") or [], key="interests")
+        hobbies_default = ", ".join(profile.get("hobbies") or [])
+        hobbies_raw = st.text_input("Hobbies (comma-separated)", value=hobbies_default,
+                                     placeholder="e.g. reading, chess, painting", key="hobbies")
         hobbies = [h.strip() for h in hobbies_raw.split(",") if h.strip()]
 
         submitted = st.form_submit_button("Save and see my matches →", use_container_width=True)
@@ -272,6 +283,7 @@ def render_assessment() -> None:
             refresh_profile()
             st.session_state.score = None
             st.session_state.insights = None
+            st.session_state.insights_checked = False
             st.session_state.nav_page = "Dashboard"
             st.rerun()
         except api.APIError as e:
@@ -287,13 +299,13 @@ def render_dashboard() -> None:
     title(f"Good to see you, {profile['name']}! 👋", "Here's where your profile points you.")
 
     if st.session_state.score is None:
-        if st.button("Find my career matches →"):
+        with st.spinner("Computing your career matches..."):
             try:
                 st.session_state.score = api.get_score()
-                st.rerun()
             except api.APIError as e:
                 st.error(f"Couldn't compute matches: {e.detail}")
-        return
+                return
+        st.rerun()
 
     matches = st.session_state.score["top_matches"]
     top = matches[0]
@@ -324,6 +336,15 @@ def render_dashboard() -> None:
             )
 
     st.markdown("<h2>AI insights</h2>", unsafe_allow_html=True)
+    if st.session_state.insights is None and not st.session_state.insights_checked:
+        st.session_state.insights_checked = True
+        try:
+            st.session_state.insights = api.get_saved_insights()
+        except api.APIError as e:
+            st.error(f"Couldn't load saved insights: {e.detail}")
+        if st.session_state.insights is not None:
+            st.rerun()
+
     if st.session_state.insights is None:
         if st.button("Get AI explanations + roadmap →"):
             try:
@@ -347,6 +368,7 @@ def render_dashboard() -> None:
     if st.button("Recompute matches (after updating your profile)"):
         st.session_state.score = None
         st.session_state.insights = None
+        st.session_state.insights_checked = False
         st.rerun()
 
 

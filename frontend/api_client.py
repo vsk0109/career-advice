@@ -69,6 +69,14 @@ def get_insights(top_matches: list) -> dict:
     ))
 
 
+def get_saved_insights() -> dict | None:
+    """Returns previously generated insights, or None if none exist yet (404)."""
+    resp = requests.get(f"{API_BASE_URL}/score/insights", headers=_auth_headers())
+    if resp.status_code == 404:
+        return None
+    return _handle(resp)
+
+
 def get_roadmap() -> dict:
     return _handle(requests.get(f"{API_BASE_URL}/roadmap", headers=_auth_headers()))
 

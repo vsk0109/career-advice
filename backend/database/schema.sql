@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS students (
     password_hash VARCHAR(255),
     interests JSON NOT NULL,
     hobbies JSON NOT NULL,
+    riasec_answers JSON,
     riasec_scores JSON NOT NULL,
     academics JSON NOT NULL,
     self_rated_skills JSON NOT NULL,
@@ -62,6 +63,18 @@ CREATE TABLE IF NOT EXISTS roadmap_steps (
     description TEXT NOT NULL,
     completed BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE
+);
+
+-- Last generated AI insights per student, so the Dashboard can show them
+-- again without re-hitting the LLM every time the page reloads. One row
+-- per student — regenerating (POST /score/insights) overwrites it.
+CREATE TABLE IF NOT EXISTS insights (
+    student_id INT PRIMARY KEY,
+    top_career VARCHAR(150) NOT NULL,
+    explanations JSON NOT NULL,
+    emerging_trend TEXT NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE
 );
 

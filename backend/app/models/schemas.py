@@ -46,6 +46,7 @@ class ProfileResponse(BaseModel):
     student_id: str
     name: str
     email: str
+    riasec_answers: list[int] = Field(default_factory=list)
     riasec_scores: dict[str, float]
     interests: list[str]
     hobbies: list[str]

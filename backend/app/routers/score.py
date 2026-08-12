@@ -31,6 +31,25 @@ def score_insights(payload: InsightsRequest, student_id: str = Depends(get_curre
     insights = generate_career_insights(profile, top_matches)
 
     if top_matches:
-        db.save_roadmap(student_id, top_matches[0]["career"], insights["roadmap"])
+        top_career = top_matches[0]["career"]
+        db.save_roadmap(student_id, top_career, insights["roadmap"])
+        db.save_insights(student_id, top_career, insights["explanations"], insights["emerging_trend"])
 
     return InsightsResponse(**insights)
+
+
+@router.get("/insights", response_model=InsightsResponse)
+def get_saved_insights(student_id: str = Depends(get_current_student_id)):
+    saved = db.get_insights(student_id)
+    if not saved:
+        raise HTTPException(status_code=404, detail="No insights generated yet")
+
+    roadmap = [
+        step["description"] for step in db.get_roadmap(student_id)
+        if step["career"] == saved["top_career"]
+    ]
+    return InsightsResponse(
+        explanations=saved["explanations"],
+        roadmap=roadmap,
+        emerging_trend=saved["emerging_trend"],
+    )

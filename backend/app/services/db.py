@@ -41,7 +41,7 @@ _JSON_CAREER_FIELDS = (
     "riasec_tags", "relevant_subjects", "required_skills", "interest_tags",
     "courses", "colleges", "scholarships", "certifications",
 )
-_JSON_STUDENT_FIELDS = ("interests", "hobbies", "riasec_scores", "academics", "self_rated_skills")
+_JSON_STUDENT_FIELDS = ("interests", "hobbies", "riasec_answers", "riasec_scores", "academics", "self_rated_skills")
 
 
 @contextmanager
@@ -78,6 +78,7 @@ def init_db():
 
         _ensure_column(cur, "students", "email", "VARCHAR(255) UNIQUE AFTER name")
         _ensure_column(cur, "students", "password_hash", "VARCHAR(255) AFTER email")
+        _ensure_column(cur, "students", "riasec_answers", "JSON AFTER hobbies")
 
 
 def _ensure_column(cur, table: str, column: str, ddl_fragment: str):
@@ -168,13 +169,14 @@ def update_profile(student_id: str, profile_fields: dict) -> None:
         cur.execute(
             """
             UPDATE students
-            SET interests = %s, hobbies = %s, riasec_scores = %s,
+            SET interests = %s, hobbies = %s, riasec_answers = %s, riasec_scores = %s,
                 academics = %s, self_rated_skills = %s
             WHERE student_id = %s
             """,
             (
                 json.dumps(profile_fields["interests"]),
                 json.dumps(profile_fields["hobbies"]),
+                json.dumps(profile_fields["riasec_answers"]),
                 json.dumps(profile_fields["riasec_scores"]),
                 json.dumps(profile_fields["academics"]),
                 json.dumps(profile_fields["self_rated_skills"]),
@@ -205,7 +207,10 @@ def get_profile(student_id: str) -> dict | None:
     row.pop("student_id", None)
     row.pop("created_at", None)
     row.pop("password_hash", None)
-    return _parse_json_fields(row, _JSON_STUDENT_FIELDS)
+    row = _parse_json_fields(row, _JSON_STUDENT_FIELDS)
+    if row["riasec_answers"] is None:
+        row["riasec_answers"] = []
+    return row
 
 
 # ---- mentor chat history ----
@@ -303,4 +308,41 @@ def update_roadmap_step(student_id: str, step_id: int, completed: bool) -> dict 
         )
         row = cur.fetchone()
     row["completed"] = bool(row["completed"])
+    return row
+
+
+# ---- AI insights (persisted so the dashboard doesn't lose them on reload) ----
+
+def save_insights(student_id: str, top_career: str, explanations: dict, emerging_trend: str) -> None:
+    numeric_id = _to_int(student_id)
+    if numeric_id is None:
+        return
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO insights (student_id, top_career, explanations, emerging_trend)
+            VALUES (%s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                top_career = VALUES(top_career),
+                explanations = VALUES(explanations),
+                emerging_trend = VALUES(emerging_trend)
+            """,
+            (numeric_id, top_career, json.dumps(explanations), emerging_trend),
+        )
+
+
+def get_insights(student_id: str) -> dict | None:
+    numeric_id = _to_int(student_id)
+    if numeric_id is None:
+        return None
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT top_career, explanations, emerging_trend FROM insights WHERE student_id = %s",
+            (numeric_id,),
+        )
+        row = cur.fetchone()
+    if not row:
+        return None
+    if isinstance(row["explanations"], str):
+        row["explanations"] = json.loads(row["explanations"])
     return row

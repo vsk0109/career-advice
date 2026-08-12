@@ -16,6 +16,7 @@ def submit_profile(payload: ProfileIntake, student_id: str = Depends(get_current
     db.update_profile(student_id, {
         "interests": payload.interests,
         "hobbies": payload.hobbies,
+        "riasec_answers": payload.riasec_answers,
         "academics": payload.academics,
         "self_rated_skills": payload.self_rated_skills,
         "riasec_scores": riasec_scores,
