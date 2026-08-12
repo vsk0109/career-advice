@@ -7,6 +7,9 @@
 CREATE TABLE IF NOT EXISTS students (
     student_id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(150) NOT NULL,
+    -- nullable in the DB (existing rows predate this column) but required by
+    -- ProfileIntake; used to upsert a returning student instead of duplicating them
+    email VARCHAR(255) UNIQUE,
     interests JSON NOT NULL,
     hobbies JSON NOT NULL,
     riasec_scores JSON NOT NULL,

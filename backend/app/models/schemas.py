@@ -6,6 +6,7 @@ from typing import Optional
 
 class ProfileIntake(BaseModel):
     name: str
+    email: str
     interests: list[str] = Field(default_factory=list)
     hobbies: list[str] = Field(default_factory=list)
     riasec_answers: list[int] = Field(
@@ -25,6 +26,7 @@ class ProfileIntake(BaseModel):
 class ProfileResponse(BaseModel):
     student_id: str
     name: str
+    email: str
     riasec_scores: dict[str, float]
     interests: list[str]
     hobbies: list[str]

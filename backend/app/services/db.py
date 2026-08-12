@@ -3,6 +3,7 @@ Data access layer — MySQL-backed.
 
 Two tables (see database/schema.sql):
   students — one row per profile, list/dict fields stored as JSON columns.
+             Uniquely identified by email; save_profile upserts on it.
   careers  — one row per career, auto-seeded from data/careers_seed.json.
 
 Function signatures (save_profile, get_profile, get_all_careers) are the
@@ -72,6 +73,20 @@ def init_db():
         if cur.fetchone()["n"] == 0:
             _seed_careers(cur)
 
+        _add_students_email_column_if_missing(cur)
+
+
+def _add_students_email_column_if_missing(cur):
+    """Migrate DBs created before the email column existed (schema.sql's
+    CREATE TABLE IF NOT EXISTS won't add it to an already-existing table)."""
+    cur.execute(
+        "SELECT COUNT(*) AS n FROM information_schema.columns "
+        "WHERE table_schema = %s AND table_name = 'students' AND column_name = 'email'",
+        (DB_NAME,),
+    )
+    if cur.fetchone()["n"] == 0:
+        cur.execute("ALTER TABLE students ADD COLUMN email VARCHAR(255) UNIQUE AFTER name")
+
 
 def _seed_careers(cur):
     careers = json.loads(CAREERS_SEED_PATH.read_text())
@@ -116,14 +131,44 @@ def get_all_careers() -> list[dict]:
 
 
 def save_profile(profile_data: dict) -> str:
+    """Upsert by email — a returning student (same email) updates their
+    existing row instead of getting a new student_id and orphaning their
+    prior chat history / roadmap."""
+    email = profile_data["email"]
+
     with get_connection() as conn, conn.cursor() as cur:
+        cur.execute("SELECT student_id FROM students WHERE email = %s", (email,))
+        existing = cur.fetchone()
+
+        if existing:
+            student_id = existing["student_id"]
+            cur.execute(
+                """
+                UPDATE students
+                SET name = %s, interests = %s, hobbies = %s, riasec_scores = %s,
+                    academics = %s, self_rated_skills = %s
+                WHERE student_id = %s
+                """,
+                (
+                    profile_data["name"],
+                    json.dumps(profile_data["interests"]),
+                    json.dumps(profile_data["hobbies"]),
+                    json.dumps(profile_data["riasec_scores"]),
+                    json.dumps(profile_data["academics"]),
+                    json.dumps(profile_data["self_rated_skills"]),
+                    student_id,
+                ),
+            )
+            return str(student_id)
+
         cur.execute(
             """
-            INSERT INTO students (name, interests, hobbies, riasec_scores, academics, self_rated_skills)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            INSERT INTO students (name, email, interests, hobbies, riasec_scores, academics, self_rated_skills)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 profile_data["name"],
+                email,
                 json.dumps(profile_data["interests"]),
                 json.dumps(profile_data["hobbies"]),
                 json.dumps(profile_data["riasec_scores"]),

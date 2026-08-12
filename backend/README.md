@@ -40,6 +40,7 @@ curl -X POST http://localhost:8000/profile \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Test Student",
+    "email": "test.student@example.com",
     "interests": ["technology", "problem-solving"],
     "hobbies": ["coding"],
     "riasec_answers": [2,2,5,5,2,1,2,3,3,2,3,3],
