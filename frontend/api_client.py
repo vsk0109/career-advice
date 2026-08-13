@@ -47,6 +47,10 @@ def login(email: str, password: str) -> dict:
     return _handle(resp)
 
 
+def get_me() -> dict:
+    return _handle(requests.get(f"{API_BASE_URL}/auth/me", headers=_auth_headers()))
+
+
 def change_password(current_password: str, new_password: str) -> dict:
     return _handle(requests.post(
         f"{API_BASE_URL}/auth/change-password",
@@ -113,3 +117,39 @@ def send_chat_message(message: str) -> dict:
     return _handle(requests.post(
         f"{API_BASE_URL}/mentor/chat", json={"message": message}, headers=_auth_headers()
     ))
+
+
+def get_bookmarks() -> list:
+    return _handle(requests.get(f"{API_BASE_URL}/bookmarks", headers=_auth_headers()))
+
+
+def add_bookmark(career_id: str) -> dict:
+    return _handle(requests.post(f"{API_BASE_URL}/bookmarks/{career_id}", headers=_auth_headers()))
+
+
+def remove_bookmark(career_id: str) -> dict:
+    return _handle(requests.delete(f"{API_BASE_URL}/bookmarks/{career_id}", headers=_auth_headers()))
+
+
+def get_career_prep(career_id: str, force_refresh: bool = False) -> dict:
+    return _handle(requests.post(
+        f"{API_BASE_URL}/prep",
+        json={"career_id": career_id, "force_refresh": force_refresh},
+        headers=_auth_headers(),
+    ))
+
+
+def admin_list_careers() -> list:
+    return _handle(requests.get(f"{API_BASE_URL}/admin/careers", headers=_auth_headers()))
+
+
+def admin_create_career(payload: dict) -> dict:
+    return _handle(requests.post(f"{API_BASE_URL}/admin/careers", json=payload, headers=_auth_headers()))
+
+
+def admin_update_career(career_id: str, payload: dict) -> dict:
+    return _handle(requests.put(f"{API_BASE_URL}/admin/careers/{career_id}", json=payload, headers=_auth_headers()))
+
+
+def admin_delete_career(career_id: str) -> dict:
+    return _handle(requests.delete(f"{API_BASE_URL}/admin/careers/{career_id}", headers=_auth_headers()))

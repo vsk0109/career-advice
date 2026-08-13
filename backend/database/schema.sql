@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS students (
     -- not by DB constraints, so existing dev databases don't need to be dropped
     email VARCHAR(255) UNIQUE,
     password_hash VARCHAR(255),
+    is_admin BOOLEAN NOT NULL DEFAULT FALSE,
     interests JSON NOT NULL,
     hobbies JSON NOT NULL,
     riasec_answers JSON,
@@ -76,6 +77,32 @@ CREATE TABLE IF NOT EXISTS insights (
     emerging_trend TEXT NOT NULL,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE
+);
+
+-- Careers a student has starred to revisit later, independent of whether
+-- they show up in that student's current top-5 matches.
+CREATE TABLE IF NOT EXISTS bookmarks (
+    bookmark_id INT AUTO_INCREMENT PRIMARY KEY,
+    student_id INT NOT NULL,
+    career_id VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_student_career (student_id, career_id),
+    FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
+    FOREIGN KEY (career_id) REFERENCES careers(id) ON DELETE CASCADE
+);
+
+-- AI-generated resume bullets / interview questions per student+career,
+-- cached the same way `insights` is so re-opening the page doesn't
+-- re-trigger an LLM call. One row per (student, career) pair.
+CREATE TABLE IF NOT EXISTS career_prep (
+    student_id INT NOT NULL,
+    career_id VARCHAR(50) NOT NULL,
+    resume_bullets JSON NOT NULL,
+    interview_questions JSON NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (student_id, career_id),
+    FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
+    FOREIGN KEY (career_id) REFERENCES careers(id) ON DELETE CASCADE
 );
 
 -- Forgot-password tokens. token_hash (sha256 of the raw token) is stored,

@@ -78,6 +78,7 @@ def init_db():
 
         _ensure_column(cur, "students", "email", "VARCHAR(255) UNIQUE AFTER name")
         _ensure_column(cur, "students", "password_hash", "VARCHAR(255) AFTER email")
+        _ensure_column(cur, "students", "is_admin", "BOOLEAN NOT NULL DEFAULT FALSE AFTER password_hash")
         _ensure_column(cur, "students", "riasec_answers", "JSON AFTER hobbies")
 
 
@@ -151,27 +152,52 @@ def create_account(name: str, email: str, password_hash: str) -> str:
 
 
 def get_student_auth_by_email(email: str) -> dict | None:
-    """Returns {student_id, name, email, password_hash} for login, or None."""
+    """Returns {student_id, name, email, password_hash, is_admin} for login, or None."""
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(
-            "SELECT student_id, name, email, password_hash FROM students WHERE email = %s",
+            "SELECT student_id, name, email, password_hash, is_admin FROM students WHERE email = %s",
             (email,),
         )
-        return cur.fetchone()
+        row = cur.fetchone()
+    if row:
+        row["is_admin"] = bool(row["is_admin"])
+    return row
 
 
 def get_student_auth_by_id(student_id: str) -> dict | None:
-    """Returns {student_id, name, email, password_hash} for the authenticated
-    caller — used by change-password to verify the current password."""
+    """Returns {student_id, name, email, password_hash, is_admin} for the
+    authenticated caller — used by change-password and the admin dependency."""
     numeric_id = _to_int(student_id)
     if numeric_id is None:
         return None
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(
-            "SELECT student_id, name, email, password_hash FROM students WHERE student_id = %s",
+            "SELECT student_id, name, email, password_hash, is_admin FROM students WHERE student_id = %s",
             (numeric_id,),
         )
-        return cur.fetchone()
+        row = cur.fetchone()
+    if row:
+        row["is_admin"] = bool(row["is_admin"])
+    return row
+
+
+def sync_admin_flag(student_id: str, email: str) -> bool:
+    """Promotes the account to admin if its email is listed in the
+    ADMIN_EMAILS env var — the bootstrap mechanism for granting the first
+    admin(s) without needing a manual SQL UPDATE. Called on every login/signup;
+    idempotent, and never demotes an account (removing an email from the env
+    var does not revoke access already granted). Returns the resulting is_admin."""
+    numeric_id = _to_int(student_id)
+    if numeric_id is None:
+        return False
+
+    admin_emails = {e.strip().lower() for e in os.getenv("ADMIN_EMAILS", "").split(",") if e.strip()}
+    with get_connection() as conn, conn.cursor() as cur:
+        if email.lower() in admin_emails:
+            cur.execute("UPDATE students SET is_admin = TRUE WHERE student_id = %s", (numeric_id,))
+        cur.execute("SELECT is_admin FROM students WHERE student_id = %s", (numeric_id,))
+        row = cur.fetchone()
+    return bool(row["is_admin"]) if row else False
 
 
 def update_password_hash(student_id: str, password_hash: str) -> None:
@@ -401,4 +427,163 @@ def get_insights(student_id: str) -> dict | None:
         return None
     if isinstance(row["explanations"], str):
         row["explanations"] = json.loads(row["explanations"])
+    return row
+
+
+# ---- admin: career management ----
+
+def get_career_by_id(career_id: str) -> dict | None:
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute("SELECT * FROM careers WHERE id = %s", (career_id,))
+        row = cur.fetchone()
+    if not row:
+        return None
+    _parse_json_fields(row, _JSON_CAREER_FIELDS)
+    row["emerging"] = bool(row["emerging"])
+    return row
+
+
+def create_career(career: dict) -> None:
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO careers
+                (id, name, description, riasec_tags, relevant_subjects, required_skills,
+                 interest_tags, courses, colleges, scholarships, certifications, emerging)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                career["id"], career["name"], career["description"],
+                json.dumps(career["riasec_tags"]),
+                json.dumps(career.get("relevant_subjects", [])),
+                json.dumps(career.get("required_skills", [])),
+                json.dumps(career.get("interest_tags", [])),
+                json.dumps(career.get("courses", [])),
+                json.dumps(career.get("colleges", [])),
+                json.dumps(career.get("scholarships", [])),
+                json.dumps(career.get("certifications", [])),
+                career.get("emerging", False),
+            ),
+        )
+
+
+def update_career(career_id: str, career: dict) -> None:
+    """id is taken from the URL path, not the payload — the row's id never changes."""
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE careers SET
+                name = %s, description = %s, riasec_tags = %s, relevant_subjects = %s,
+                required_skills = %s, interest_tags = %s, courses = %s, colleges = %s,
+                scholarships = %s, certifications = %s, emerging = %s
+            WHERE id = %s
+            """,
+            (
+                career["name"], career["description"],
+                json.dumps(career["riasec_tags"]),
+                json.dumps(career.get("relevant_subjects", [])),
+                json.dumps(career.get("required_skills", [])),
+                json.dumps(career.get("interest_tags", [])),
+                json.dumps(career.get("courses", [])),
+                json.dumps(career.get("colleges", [])),
+                json.dumps(career.get("scholarships", [])),
+                json.dumps(career.get("certifications", [])),
+                career.get("emerging", False),
+                career_id,
+            ),
+        )
+
+
+def delete_career(career_id: str) -> None:
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute("DELETE FROM careers WHERE id = %s", (career_id,))
+
+
+# ---- bookmarks ----
+
+def add_bookmark(student_id: str, career_id: str) -> None:
+    numeric_id = _to_int(student_id)
+    if numeric_id is None:
+        return
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            "INSERT IGNORE INTO bookmarks (student_id, career_id) VALUES (%s, %s)",
+            (numeric_id, career_id),
+        )
+
+
+def remove_bookmark(student_id: str, career_id: str) -> None:
+    numeric_id = _to_int(student_id)
+    if numeric_id is None:
+        return
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            "DELETE FROM bookmarks WHERE student_id = %s AND career_id = %s",
+            (numeric_id, career_id),
+        )
+
+
+def get_bookmarked_career_ids(student_id: str) -> list[str]:
+    numeric_id = _to_int(student_id)
+    if numeric_id is None:
+        return []
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute("SELECT career_id FROM bookmarks WHERE student_id = %s", (numeric_id,))
+        rows = cur.fetchall()
+    return [row["career_id"] for row in rows]
+
+
+def get_bookmarked_careers(student_id: str) -> list[dict]:
+    numeric_id = _to_int(student_id)
+    if numeric_id is None:
+        return []
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT c.* FROM careers c JOIN bookmarks b ON b.career_id = c.id "
+            "WHERE b.student_id = %s ORDER BY b.created_at DESC",
+            (numeric_id,),
+        )
+        rows = cur.fetchall()
+    for row in rows:
+        _parse_json_fields(row, _JSON_CAREER_FIELDS)
+        row["emerging"] = bool(row["emerging"])
+    return rows
+
+
+# ---- career prep (resume bullets + interview questions, cached per student+career) ----
+
+def save_career_prep(student_id: str, career_id: str, resume_bullets: list[str], interview_questions: list[str]) -> None:
+    numeric_id = _to_int(student_id)
+    if numeric_id is None:
+        return
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO career_prep (student_id, career_id, resume_bullets, interview_questions)
+            VALUES (%s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                resume_bullets = VALUES(resume_bullets),
+                interview_questions = VALUES(interview_questions)
+            """,
+            (numeric_id, career_id, json.dumps(resume_bullets), json.dumps(interview_questions)),
+        )
+
+
+def get_career_prep(student_id: str, career_id: str) -> dict | None:
+    numeric_id = _to_int(student_id)
+    if numeric_id is None:
+        return None
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT resume_bullets, interview_questions FROM career_prep "
+            "WHERE student_id = %s AND career_id = %s",
+            (numeric_id, career_id),
+        )
+        row = cur.fetchone()
+    if not row:
+        return None
+    if isinstance(row["resume_bullets"], str):
+        row["resume_bullets"] = json.loads(row["resume_bullets"])
+    if isinstance(row["interview_questions"], str):
+        row["interview_questions"] = json.loads(row["interview_questions"])
     return row

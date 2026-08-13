@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.models.schemas import (
-    SignupRequest, LoginRequest, AuthResponse,
+    SignupRequest, LoginRequest, AuthResponse, MeResponse,
     ChangePasswordRequest, ForgotPasswordRequest, ForgotPasswordResponse,
     ResetPasswordRequest, MessageResponse,
 )
@@ -14,14 +14,32 @@ from app.services.auth import (
 router = APIRouter()
 
 
+@router.get("/me", response_model=MeResponse)
+def me(student_id: str = Depends(get_current_student_id)):
+    """Lets the frontend restore a session (name/email/is_admin) from just
+    the JWT after a page refresh wipes Streamlit's in-memory session_state —
+    the token itself only encodes {sub, exp}, not these display fields."""
+    student = db.get_student_auth_by_id(student_id)
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    return MeResponse(
+        student_id=str(student["student_id"]), name=student["name"],
+        email=student["email"], is_admin=student["is_admin"],
+    )
+
+
 @router.post("/signup", response_model=AuthResponse)
 def signup(payload: SignupRequest):
     if db.get_student_auth_by_email(payload.email):
         raise HTTPException(status_code=409, detail="An account with this email already exists")
 
     student_id = db.create_account(payload.name, payload.email, hash_password(payload.password))
+    is_admin = db.sync_admin_flag(student_id, payload.email)
     token = create_access_token(student_id)
-    return AuthResponse(student_id=student_id, name=payload.name, email=payload.email, access_token=token)
+    return AuthResponse(
+        student_id=student_id, name=payload.name, email=payload.email,
+        access_token=token, is_admin=is_admin,
+    )
 
 
 @router.post("/login", response_model=AuthResponse)
@@ -31,8 +49,12 @@ def login(payload: LoginRequest):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     student_id = str(student["student_id"])
+    is_admin = db.sync_admin_flag(student_id, student["email"])
     token = create_access_token(student_id)
-    return AuthResponse(student_id=student_id, name=student["name"], email=student["email"], access_token=token)
+    return AuthResponse(
+        student_id=student_id, name=student["name"], email=student["email"],
+        access_token=token, is_admin=is_admin,
+    )
 
 
 @router.post("/change-password", response_model=MessageResponse)

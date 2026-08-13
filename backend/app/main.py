@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import profile, careers, score, mentor, roadmap, auth
+from app.routers import profile, careers, score, mentor, roadmap, auth, admin, bookmarks, prep
 from app.services.db import init_db
 
 app = FastAPI(
@@ -37,6 +37,9 @@ app.include_router(careers.router, prefix="/careers", tags=["careers"])
 app.include_router(score.router, prefix="/score", tags=["score"])
 app.include_router(mentor.router, prefix="/mentor", tags=["mentor"])
 app.include_router(roadmap.router, prefix="/roadmap", tags=["roadmap"])
+app.include_router(admin.router, prefix="/admin", tags=["admin"])
+app.include_router(bookmarks.router, prefix="/bookmarks", tags=["bookmarks"])
+app.include_router(prep.router, prefix="/prep", tags=["prep"])
 
 
 @app.get("/")

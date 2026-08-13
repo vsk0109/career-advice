@@ -9,18 +9,22 @@
     "interest_tags": ["technology", "problem-solving", "research", "data"],
     "courses": [
       {"name": "B.Sc Statistics", "level": "undergrad"},
-      {"name": "B.Tech Computer Science", "level": "undergrad"}
+      {"name": "B.Tech Computer Science", "level": "undergrad"},
+      {"name": "M.Sc Data Science", "level": "postgrad"}
     ],
     "colleges": [
       {"name": "IIT Bombay", "location": "Mumbai"},
-      {"name": "ISI Kolkata", "location": "Kolkata"}
+      {"name": "ISI Kolkata", "location": "Kolkata"},
+      {"name": "IIIT Bangalore", "location": "Bengaluru"}
     ],
     "scholarships": [
-      {"name": "AICTE Pragati Scholarship", "eligibility": "Girl students in technical undergraduate courses", "link": "https://www.aicte-india.org/"}
+      {"name": "AICTE Pragati Scholarship", "eligibility": "Girl students in technical undergraduate courses", "link": "https://www.aicte-india.org/", "typical_deadline": "Applications usually open on the National Scholarship Portal around Aug-Oct each academic year"},
+      {"name": "KVPY Fellowship", "eligibility": "Students pursuing basic sciences with research aptitude", "link": "https://kvpy.iisc.ac.in/", "typical_deadline": "Historically an annual cycle with registration around Jul-Aug — check current status, KVPY has been phased into other schemes"}
     ],
     "certifications": [
       {"name": "Google Data Analytics Certificate", "provider": "Coursera"},
-      {"name": "IBM Data Science Professional Certificate", "provider": "Coursera"}
+      {"name": "IBM Data Science Professional Certificate", "provider": "Coursera"},
+      {"name": "Deep Learning Specialization", "provider": "Coursera (DeepLearning.AI)"}
     ],
     "emerging": true
   },
@@ -34,17 +38,21 @@
     "interest_tags": ["technology", "coding", "problem-solving"],
     "courses": [
       {"name": "B.Tech Computer Science", "level": "undergrad"},
-      {"name": "B.Sc Computer Science", "level": "undergrad"}
+      {"name": "B.Sc Computer Science", "level": "undergrad"},
+      {"name": "M.Tech Software Engineering", "level": "postgrad"}
     ],
     "colleges": [
       {"name": "IIT Delhi", "location": "Delhi"},
-      {"name": "BITS Pilani", "location": "Pilani"}
+      {"name": "BITS Pilani", "location": "Pilani"},
+      {"name": "IIIT Hyderabad", "location": "Hyderabad"}
     ],
     "scholarships": [
-      {"name": "Central Sector Scholarship Scheme", "eligibility": "Merit-based, general undergrad", "link": "https://scholarships.gov.in/"}
+      {"name": "Central Sector Scholarship Scheme", "eligibility": "Merit-based, general undergrad", "link": "https://scholarships.gov.in/", "typical_deadline": "National Scholarship Portal applications typically open around Aug-Oct each academic year"},
+      {"name": "Reliance Foundation Undergraduate Scholarship", "eligibility": "Merit-cum-means for undergraduates", "link": "https://www.reliancefoundation.org/", "typical_deadline": "Applications typically open around Jun-Aug annually"}
     ],
     "certifications": [
-      {"name": "Meta Front-End Developer Certificate", "provider": "Coursera"}
+      {"name": "Meta Front-End Developer Certificate", "provider": "Coursera"},
+      {"name": "AWS Certified Cloud Practitioner", "provider": "AWS"}
     ],
     "emerging": false
   },
@@ -58,17 +66,20 @@
     "interest_tags": ["design", "art", "technology", "creativity"],
     "courses": [
       {"name": "B.Des in Interaction Design", "level": "undergrad"},
-      {"name": "B.Sc Psychology", "level": "undergrad"}
+      {"name": "B.Sc Psychology", "level": "undergrad"},
+      {"name": "M.Des Human-Computer Interaction", "level": "postgrad"}
     ],
     "colleges": [
       {"name": "NID Ahmedabad", "location": "Ahmedabad"},
-      {"name": "IIT Guwahati (Design)", "location": "Guwahati"}
+      {"name": "IIT Guwahati (Design)", "location": "Guwahati"},
+      {"name": "MIT Institute of Design", "location": "Pune"}
     ],
     "scholarships": [
-      {"name": "NID Merit Scholarship", "eligibility": "Merit-based for design undergrads"}
+      {"name": "NID Merit Scholarship", "eligibility": "Merit-based for design undergrads", "typical_deadline": "Tied to NID's own admission cycle — usually finalized shortly after admission each year, around Jun-Jul"}
     ],
     "certifications": [
-      {"name": "Google UX Design Certificate", "provider": "Coursera"}
+      {"name": "Google UX Design Certificate", "provider": "Coursera"},
+      {"name": "Figma Academy Advanced UI/UX", "provider": "Figma"}
     ],
     "emerging": true
   },
@@ -82,14 +93,17 @@
     "interest_tags": ["helping", "psychology", "counseling", "healthcare"],
     "courses": [
       {"name": "B.A/B.Sc Psychology", "level": "undergrad"},
-      {"name": "M.A Clinical Psychology", "level": "postgrad"}
+      {"name": "M.A Clinical Psychology", "level": "postgrad"},
+      {"name": "M.Phil Clinical Psychology (RCI-recognized)", "level": "postgrad"}
     ],
     "colleges": [
       {"name": "Delhi University", "location": "Delhi"},
-      {"name": "TISS Mumbai", "location": "Mumbai"}
+      {"name": "TISS Mumbai", "location": "Mumbai"},
+      {"name": "NIMHANS Bengaluru", "location": "Bengaluru"}
     ],
     "scholarships": [
-      {"name": "National Merit Scholarship", "eligibility": "Merit-based general"}
+      {"name": "National Merit Scholarship", "eligibility": "Merit-based general", "typical_deadline": "National Scholarship Portal applications typically open around Aug-Oct each academic year"},
+      {"name": "UGC NET-JRF Fellowship", "eligibility": "Postgraduates qualifying UGC NET for research", "link": "https://ugcnet.nta.nic.in/", "typical_deadline": "UGC NET is held twice a year (cycles roughly Jun and Dec) — check NTA's current exam calendar"}
     ],
     "certifications": [
       {"name": "Foundations of Positive Psychology", "provider": "Coursera"}
@@ -106,17 +120,21 @@
     "interest_tags": ["business", "leadership", "innovation"],
     "courses": [
       {"name": "BBA", "level": "undergrad"},
-      {"name": "B.Com", "level": "undergrad"}
+      {"name": "B.Com", "level": "undergrad"},
+      {"name": "MBA", "level": "postgrad"}
     ],
     "colleges": [
       {"name": "Shaheed Sukhdev College of Business Studies", "location": "Delhi"},
-      {"name": "NMIMS Mumbai", "location": "Mumbai"}
+      {"name": "NMIMS Mumbai", "location": "Mumbai"},
+      {"name": "IIM Ahmedabad", "location": "Ahmedabad"}
     ],
     "scholarships": [
-      {"name": "Young Entrepreneur Scholarship", "eligibility": "Students with a startup idea/pitch"}
+      {"name": "Young Entrepreneur Scholarship", "eligibility": "Students with a startup idea/pitch", "typical_deadline": "Rolling or cohort-based — check the offering institution's current call for applications"},
+      {"name": "Startup India Seed Fund", "eligibility": "Early-stage founders/students with a registered startup", "link": "https://www.startupindia.gov.in/", "typical_deadline": "Rolling applications, reviewed periodically by incubator partners — no fixed annual window"}
     ],
     "certifications": [
-      {"name": "Entrepreneurship Specialization", "provider": "Coursera (Wharton)"}
+      {"name": "Entrepreneurship Specialization", "provider": "Coursera (Wharton)"},
+      {"name": "Financial Markets", "provider": "Coursera (Yale)"}
     ],
     "emerging": false
   },
@@ -129,16 +147,168 @@
     "required_skills": ["Research", "Data Analysis", "Fieldwork", "Report Writing"],
     "interest_tags": ["environment", "science", "sustainability", "research"],
     "courses": [
-      {"name": "B.Sc Environmental Science", "level": "undergrad"}
+      {"name": "B.Sc Environmental Science", "level": "undergrad"},
+      {"name": "M.Sc Environmental Science", "level": "postgrad"}
     ],
     "colleges": [
-      {"name": "TERI School of Advanced Studies", "location": "Delhi"}
+      {"name": "TERI School of Advanced Studies", "location": "Delhi"},
+      {"name": "FRI University", "location": "Dehradun"}
     ],
     "scholarships": [
-      {"name": "Green Talent Scholarship", "eligibility": "Sustainability-focused students"}
+      {"name": "Green Talent Scholarship", "eligibility": "Sustainability-focused students", "typical_deadline": "Annual cycle, applications commonly open around May-Jul — confirm with the current sponsoring organization"}
     ],
     "certifications": [
       {"name": "Sustainability and Environmental Management", "provider": "edX"}
+    ],
+    "emerging": true
+  },
+  {
+    "id": "mechanical-engineer",
+    "name": "Mechanical Engineer",
+    "description": "Designs, builds, and tests mechanical systems and machines, from engines to robotics.",
+    "riasec_tags": {"R": 9, "I": 7, "A": 2, "S": 2, "E": 4, "C": 5},
+    "relevant_subjects": ["Physics", "Math", "Computer Science"],
+    "required_skills": ["Problem Solving", "Design Tools", "Data Analysis", "Teamwork"],
+    "interest_tags": ["technology", "problem-solving", "science"],
+    "courses": [
+      {"name": "B.Tech Mechanical Engineering", "level": "undergrad"},
+      {"name": "M.Tech Robotics and Automation", "level": "postgrad"}
+    ],
+    "colleges": [
+      {"name": "IIT Madras", "location": "Chennai"},
+      {"name": "VIT Vellore", "location": "Vellore"},
+      {"name": "PSG College of Technology", "location": "Coimbatore"}
+    ],
+    "scholarships": [
+      {"name": "Central Sector Scholarship Scheme", "eligibility": "Merit-based, general undergrad", "link": "https://scholarships.gov.in/", "typical_deadline": "National Scholarship Portal applications typically open around Aug-Oct each academic year"}
+    ],
+    "certifications": [
+      {"name": "AutoCAD Certified Professional", "provider": "Autodesk"},
+      {"name": "SolidWorks Associate (CSWA)", "provider": "Dassault Systèmes"}
+    ],
+    "emerging": false
+  },
+  {
+    "id": "civil-engineer",
+    "name": "Civil Engineer",
+    "description": "Plans and oversees construction of infrastructure like buildings, roads, and bridges.",
+    "riasec_tags": {"R": 8, "I": 6, "A": 2, "S": 3, "E": 5, "C": 6},
+    "relevant_subjects": ["Physics", "Math", "Geography"],
+    "required_skills": ["Design Tools", "Problem Solving", "Report Writing", "Teamwork"],
+    "interest_tags": ["technology", "problem-solving", "science"],
+    "courses": [
+      {"name": "B.Tech Civil Engineering", "level": "undergrad"},
+      {"name": "M.Tech Structural Engineering", "level": "postgrad"}
+    ],
+    "colleges": [
+      {"name": "IIT Roorkee", "location": "Roorkee"},
+      {"name": "NIT Trichy", "location": "Tiruchirappalli"},
+      {"name": "Jadavpur University", "location": "Kolkata"}
+    ],
+    "scholarships": [
+      {"name": "Central Sector Scholarship Scheme", "eligibility": "Merit-based, general undergrad", "link": "https://scholarships.gov.in/", "typical_deadline": "National Scholarship Portal applications typically open around Aug-Oct each academic year"}
+    ],
+    "certifications": [
+      {"name": "AutoCAD Civil 3D Certification", "provider": "Autodesk"},
+      {"name": "Project Management Professional (PMP)", "provider": "PMI"}
+    ],
+    "emerging": false
+  },
+  {
+    "id": "physician",
+    "name": "Physician (Doctor)",
+    "description": "Diagnoses and treats illnesses, providing medical care to patients.",
+    "riasec_tags": {"R": 4, "I": 9, "A": 2, "S": 8, "E": 3, "C": 5},
+    "relevant_subjects": ["Biology", "Chemistry", "Physics"],
+    "required_skills": ["Research", "Communication", "Empathy", "Data Analysis"],
+    "interest_tags": ["healthcare", "helping", "science", "research"],
+    "courses": [
+      {"name": "MBBS", "level": "undergrad"},
+      {"name": "MD/MS Specialization", "level": "postgrad"}
+    ],
+    "colleges": [
+      {"name": "AIIMS Delhi", "location": "Delhi"},
+      {"name": "Christian Medical College, Vellore", "location": "Vellore"},
+      {"name": "Armed Forces Medical College", "location": "Pune"}
+    ],
+    "scholarships": [
+      {"name": "Central Sector Scheme for MBBS Students", "eligibility": "Merit-cum-means for medical undergraduates", "link": "https://scholarships.gov.in/", "typical_deadline": "National Scholarship Portal applications typically open around Aug-Oct each academic year"}
+    ],
+    "certifications": [
+      {"name": "Basic Life Support (BLS) Certification", "provider": "American Heart Association"}
+    ],
+    "emerging": false
+  },
+  {
+    "id": "chartered-accountant",
+    "name": "Chartered Accountant",
+    "description": "Manages financial records, audits, taxation, and compliance for individuals and organizations.",
+    "riasec_tags": {"R": 1, "I": 5, "A": 1, "S": 3, "E": 6, "C": 9},
+    "relevant_subjects": ["Business Studies", "Economics", "Math"],
+    "required_skills": ["Financial Literacy", "Data Analysis", "Report Writing", "Problem Solving"],
+    "interest_tags": ["business", "data"],
+    "courses": [
+      {"name": "CA Foundation, Intermediate, and Final (ICAI)", "level": "professional"},
+      {"name": "B.Com", "level": "undergrad"}
+    ],
+    "colleges": [
+      {"name": "Shri Ram College of Commerce", "location": "Delhi"},
+      {"name": "Narsee Monjee College of Commerce", "location": "Mumbai"}
+    ],
+    "scholarships": [
+      {"name": "ICAI Merit Scholarship", "eligibility": "Rank holders in CA exams", "link": "https://www.icai.org/", "typical_deadline": "Announced by ICAI shortly after each exam result cycle (May and Nov exam sessions) — check ICAI's current notification"}
+    ],
+    "certifications": [
+      {"name": "Certified Public Accountant (CPA)", "provider": "AICPA"}
+    ],
+    "emerging": false
+  },
+  {
+    "id": "content-writer-journalist",
+    "name": "Journalist / Content Writer",
+    "description": "Researches, writes, and edits news, articles, and content across print and digital media.",
+    "riasec_tags": {"R": 1, "I": 5, "A": 8, "S": 5, "E": 4, "C": 3},
+    "relevant_subjects": ["English", "Geography", "Business Studies"],
+    "required_skills": ["Report Writing", "Research", "Communication", "Creativity"],
+    "interest_tags": ["creativity", "research", "business"],
+    "courses": [
+      {"name": "B.A Journalism and Mass Communication", "level": "undergrad"},
+      {"name": "M.A Convergent Journalism", "level": "postgrad"}
+    ],
+    "colleges": [
+      {"name": "Indian Institute of Mass Communication", "location": "Delhi"},
+      {"name": "Symbiosis Institute of Media and Communication", "location": "Pune"}
+    ],
+    "scholarships": [
+      {"name": "Prem Bhatia Memorial Trust Scholarship", "eligibility": "Journalism students with strong academic record", "typical_deadline": "Annual award, applications typically invited around Jul-Aug — confirm with the current trust notice"}
+    ],
+    "certifications": [
+      {"name": "Google News Initiative Digital Journalism Certificate", "provider": "Google"}
+    ],
+    "emerging": false
+  },
+  {
+    "id": "cybersecurity-analyst",
+    "name": "Cybersecurity Analyst",
+    "description": "Protects organizations' systems and data from cyber threats by monitoring, detecting, and responding to attacks.",
+    "riasec_tags": {"R": 3, "I": 8, "A": 1, "S": 2, "E": 4, "C": 7},
+    "relevant_subjects": ["Computer Science", "Math", "Physics"],
+    "required_skills": ["Coding", "Problem Solving", "Data Analysis", "Debugging"],
+    "interest_tags": ["technology", "problem-solving", "data"],
+    "courses": [
+      {"name": "B.Tech Computer Science (Cybersecurity)", "level": "undergrad"},
+      {"name": "M.Tech Information Security", "level": "postgrad"}
+    ],
+    "colleges": [
+      {"name": "IIIT Delhi", "location": "Delhi"},
+      {"name": "Amrita Vishwa Vidyapeetham", "location": "Coimbatore"}
+    ],
+    "scholarships": [
+      {"name": "AICTE Pragati Scholarship", "eligibility": "Girl students in technical undergraduate courses", "link": "https://www.aicte-india.org/", "typical_deadline": "Applications usually open on the National Scholarship Portal around Aug-Oct each academic year"}
+    ],
+    "certifications": [
+      {"name": "CompTIA Security+", "provider": "CompTIA"},
+      {"name": "Certified Ethical Hacker (CEH)", "provider": "EC-Council"}
     ],
     "emerging": true
   }

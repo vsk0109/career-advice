@@ -126,6 +126,7 @@ def rank_careers(student: dict, careers: list[dict], top_n: int = 5) -> list[dic
     for career in careers:
         breakdown = career_suitability_score(student, career)
         results.append({
+            "career_id": career["id"],
             "career": career["name"],
             **breakdown,
             "courses": career.get("courses", []),

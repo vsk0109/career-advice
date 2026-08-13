@@ -66,3 +66,16 @@ def get_current_student_id(authorization: str = Header(default=None)) -> str:
         raise HTTPException(status_code=401, detail="Invalid authentication token")
 
     return payload["sub"]
+
+
+def get_current_admin_id(authorization: str = Header(default=None)) -> str:
+    """Same identity check as get_current_student_id, plus an is_admin gate —
+    use this dependency on any route that manages shared data (careers, etc.)
+    rather than a single student's own records."""
+    from app.services import db
+
+    student_id = get_current_student_id(authorization)
+    student = db.get_student_auth_by_id(student_id)
+    if not student or not student["is_admin"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return student_id

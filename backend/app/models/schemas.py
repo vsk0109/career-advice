@@ -21,6 +21,14 @@ class AuthResponse(BaseModel):
     email: str
     access_token: str
     token_type: str = "bearer"
+    is_admin: bool = False
+
+
+class MeResponse(BaseModel):
+    student_id: str
+    name: str
+    email: str
+    is_admin: bool = False
 
 
 class ChangePasswordRequest(BaseModel):
@@ -97,6 +105,7 @@ class ScholarshipInfo(BaseModel):
     name: str
     eligibility: Optional[str] = None
     link: Optional[str] = None
+    typical_deadline: Optional[str] = None
 
 
 class CertificationInfo(BaseModel):
@@ -122,6 +131,7 @@ class Career(BaseModel):
 # ---------- Score ----------
 
 class CareerMatch(BaseModel):
+    career_id: str
     career: str
     score: float
     riasec_match: float
@@ -185,3 +195,15 @@ class RoadmapResponse(BaseModel):
 
 class RoadmapStepUpdate(BaseModel):
     completed: bool
+
+
+# ---- Career prep (resume bullets + interview questions) ----
+
+class PrepRequest(BaseModel):
+    career_id: str
+    force_refresh: bool = False
+
+
+class PrepResponse(BaseModel):
+    resume_bullets: list[str]
+    interview_questions: list[str]
