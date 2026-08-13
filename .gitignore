@@ -12,6 +12,8 @@ frontend/.venv/
 .env
 backend/.env
 frontend/.env
+backend/certs/
+*.pem
 
 # Node / frontend
 node_modules/

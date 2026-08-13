@@ -12,7 +12,22 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+
+def _resolve_api_base_url() -> str:
+    """Local dev reads API_BASE_URL from .env via os.environ. Streamlit
+    Community Cloud doesn't inject secrets.toml values into os.environ —
+    they're only reachable via st.secrets — so fall back to that, then to
+    localhost for a bare first-time run with neither configured."""
+    env_value = os.getenv("API_BASE_URL")
+    if env_value:
+        return env_value
+    try:
+        return st.secrets["API_BASE_URL"]
+    except Exception:
+        return "http://localhost:8000"
+
+
+API_BASE_URL = _resolve_api_base_url()
 
 
 class APIError(Exception):

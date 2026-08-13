@@ -38,6 +38,14 @@ DB_CONFIG = {
     "autocommit": True,
 }
 
+# Managed MySQL providers (Aiven, PlanetScale, RDS, ...) require TLS and give
+# you a CA certificate to verify against. Local MySQL has no such cert, so
+# this stays opt-in — unset locally, DB_CONFIG is unchanged from before.
+_ssl_ca = os.getenv("MYSQL_SSL_CA")
+if _ssl_ca:
+    DB_CONFIG["ssl_ca"] = _ssl_ca
+    DB_CONFIG["ssl_verify_cert"] = True
+
 _JSON_CAREER_FIELDS = (
     "riasec_tags", "relevant_subjects", "required_skills", "interest_tags",
     "courses", "colleges", "scholarships", "certifications",
