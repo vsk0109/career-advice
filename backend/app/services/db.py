@@ -25,6 +25,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 CAREERS_SEED_PATH = Path(__file__).parent.parent / "data" / "careers_seed.json"
+COLLEGES_SEED_PATH = Path(__file__).parent.parent / "data" / "colleges_seed.json"
 SCHEMA_PATH = Path(__file__).parent.parent.parent / "database" / "schema.sql"
 
 DB_NAME = os.getenv("MYSQL_DATABASE", "career_mentor")
@@ -42,6 +43,7 @@ _JSON_CAREER_FIELDS = (
     "courses", "colleges", "scholarships", "certifications",
 )
 _JSON_STUDENT_FIELDS = ("interests", "hobbies", "riasec_answers", "riasec_scores", "academics", "self_rated_skills")
+_JSON_COLLEGE_FIELDS = ("known_for",)
 
 
 @contextmanager
@@ -75,6 +77,10 @@ def init_db():
         cur.execute("SELECT COUNT(*) AS n FROM careers")
         if cur.fetchone()["n"] == 0:
             _seed_careers(cur)
+
+        cur.execute("SELECT COUNT(*) AS n FROM colleges")
+        if cur.fetchone()["n"] == 0:
+            _seed_colleges(cur)
 
         _ensure_column(cur, "students", "email", "VARCHAR(255) UNIQUE AFTER name")
         _ensure_column(cur, "students", "password_hash", "VARCHAR(255) AFTER email")
@@ -119,6 +125,22 @@ def _seed_careers(cur):
         )
 
 
+def _seed_colleges(cur):
+    colleges = json.loads(COLLEGES_SEED_PATH.read_text())
+    for c in colleges:
+        cur.execute(
+            """
+            INSERT INTO colleges (id, name, location, state, type, established, website, known_for)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                c["id"], c["name"], c["location"], c["state"], c["type"],
+                c.get("established"), c.get("website"),
+                json.dumps(c.get("known_for", [])),
+            ),
+        )
+
+
 def _parse_json_fields(row: dict, fields: tuple[str, ...]) -> dict:
     for field in fields:
         if isinstance(row[field], str):
@@ -133,6 +155,15 @@ def get_all_careers() -> list[dict]:
     for row in rows:
         _parse_json_fields(row, _JSON_CAREER_FIELDS)
         row["emerging"] = bool(row["emerging"])
+    return rows
+
+
+def get_all_colleges() -> list[dict]:
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute("SELECT * FROM colleges ORDER BY name ASC")
+        rows = cur.fetchall()
+    for row in rows:
+        _parse_json_fields(row, _JSON_COLLEGE_FIELDS)
     return rows
 
 

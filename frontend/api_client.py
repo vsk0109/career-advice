@@ -81,6 +81,10 @@ def get_careers() -> list:
     return _handle(requests.get(f"{API_BASE_URL}/careers"))
 
 
+def get_colleges() -> list:
+    return _handle(requests.get(f"{API_BASE_URL}/colleges"))
+
+
 def get_score() -> dict:
     return _handle(requests.post(f"{API_BASE_URL}/score", headers=_auth_headers()))
 

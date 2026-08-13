@@ -893,10 +893,110 @@ def render_admin() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Scholarships directory
+# ---------------------------------------------------------------------------
+
+def render_scholarships() -> None:
+    title("Scholarships", "Browse scholarships across every career and filter by name or career.")
+    all_careers = get_all_careers()
+
+    seen = set()
+    rows = []
+    for career in all_careers:
+        for sch in career.get("scholarships", []):
+            key = (sch["name"], career["id"])
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append((career["name"], sch))
+
+    search = st.text_input("Search by scholarship name", key="scholarship_search")
+    career_names = sorted({name for name, _ in rows})
+    career_filter = st.multiselect("Filter by career", career_names, key="scholarship_career_filter")
+
+    filtered = rows
+    if search:
+        filtered = [(cn, s) for cn, s in filtered if search.lower() in s["name"].lower()]
+    if career_filter:
+        filtered = [(cn, s) for cn, s in filtered if cn in career_filter]
+
+    st.markdown(f"<p class='muted'>{len(filtered)} of {len(rows)} scholarships</p>", unsafe_allow_html=True)
+
+    for career_name, sch in filtered:
+        link_html = (f"<p style='margin-top:6px;'><a href='{escape(sch['link'])}' target='_blank'>More info</a></p>"
+                     if sch.get("link") else "")
+        st.markdown(
+            f"<div class='card' style='margin-bottom:12px;'>"
+            f"<h3>{escape(sch['name'])}</h3>"
+            f"<p class='muted'>For: {escape(career_name)}</p>"
+            f"<p>{escape(sch.get('typical_deadline') or 'No timing info available yet.')}</p>"
+            f"<p class='muted'>{escape(sch.get('eligibility') or '')}</p>"
+            f"{link_html}"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+    if not filtered:
+        st.info("No scholarships match your filters.")
+
+
+# ---------------------------------------------------------------------------
+# Universities & Colleges directory
+# ---------------------------------------------------------------------------
+
+def render_colleges() -> None:
+    title("Universities & Colleges", "Browse institutions and filter by type, state, or what they're known for.")
+    try:
+        colleges = api.get_colleges()
+    except api.APIError as e:
+        st.error(f"Couldn't load colleges: {e.detail}")
+        return
+
+    search = st.text_input("Search by name", key="college_search")
+    types = sorted({c["type"] for c in colleges})
+    states = sorted({c["state"] for c in colleges})
+
+    col1, col2 = st.columns(2)
+    with col1:
+        type_filter = st.multiselect("Filter by type", types, key="college_type_filter")
+    with col2:
+        state_filter = st.multiselect("Filter by state", states, key="college_state_filter")
+
+    filtered = colleges
+    if search:
+        filtered = [c for c in filtered if search.lower() in c["name"].lower()]
+    if type_filter:
+        filtered = [c for c in filtered if c["type"] in type_filter]
+    if state_filter:
+        filtered = [c for c in filtered if c["state"] in state_filter]
+
+    st.markdown(f"<p class='muted'>{len(filtered)} of {len(colleges)} institutions</p>", unsafe_allow_html=True)
+
+    cols = st.columns(3)
+    for i, college in enumerate(filtered):
+        with cols[i % 3]:
+            established = f" · est. {college['established']}" if college.get("established") else ""
+            website_html = (f"<p style='margin-top:8px;'><a href='{escape(college['website'])}' target='_blank'>Website</a></p>"
+                             if college.get("website") else "")
+            st.markdown(
+                f"<div class='career-card' style='margin-bottom:14px;'>"
+                f"<div class='career-name'>{escape(college['name'])}</div>"
+                f"<p class='muted'>{escape(college['location'])}, {escape(college['state'])} · {escape(college['type'])}{established}</p>"
+                f"<p class='muted'>Known for:</p>{tags_html(college['known_for'])}"
+                f"{website_html}"
+                "</div>",
+                unsafe_allow_html=True,
+            )
+
+    if not filtered:
+        st.info("No colleges match your filters.")
+
+
+# ---------------------------------------------------------------------------
 # Navigation
 # ---------------------------------------------------------------------------
 
-PAGES = ("Dashboard", "Assessment", "Roadmap", "Mentor", "Explore")
+PAGES = ("Dashboard", "Assessment", "Roadmap", "Mentor", "Explore", "Colleges", "Scholarships")
 
 
 def render_sidebar() -> None:
@@ -904,7 +1004,7 @@ def render_sidebar() -> None:
         st.markdown(BRAND_HTML,
                      unsafe_allow_html=True)
 
-        nav_pages = ("Roadmap", "Mentor", "Explore") if st.session_state.is_admin else PAGES
+        nav_pages = ("Roadmap", "Mentor", "Explore", "Colleges", "Scholarships") if st.session_state.is_admin else PAGES
         for page in nav_pages:
             active = st.session_state.nav_page == page
             if st.button(page, key=f"nav_{page}", use_container_width=True,
@@ -963,6 +1063,10 @@ def render_app() -> None:
             render_mentor()
         elif page == "Explore":
             render_explore()
+        elif page == "Colleges":
+            render_colleges()
+        elif page == "Scholarships":
+            render_scholarships()
         else:
             render_admin()
         return
@@ -979,6 +1083,10 @@ def render_app() -> None:
         render_mentor()
     elif page == "Explore":
         render_explore()
+    elif page == "Colleges":
+        render_colleges()
+    elif page == "Scholarships":
+        render_scholarships()
 
 
 def main() -> None:

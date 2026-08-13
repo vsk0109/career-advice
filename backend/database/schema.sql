@@ -42,6 +42,21 @@ CREATE TABLE IF NOT EXISTS careers (
     emerging BOOLEAN NOT NULL DEFAULT FALSE
 );
 
+-- Standalone directory of universities/colleges (independent of which career
+-- pages happen to mention them) for the dedicated Colleges nav page, with
+-- richer fields (type, state, established, website) for search/filtering.
+-- colleges_seed.json is the source of truth, auto-seeded on first startup.
+CREATE TABLE IF NOT EXISTS colleges (
+    id VARCHAR(50) PRIMARY KEY,
+    name VARCHAR(200) NOT NULL,
+    location VARCHAR(150) NOT NULL,
+    state VARCHAR(100) NOT NULL,
+    type VARCHAR(100) NOT NULL,
+    established INT,
+    website VARCHAR(255),
+    known_for JSON NOT NULL
+);
+
 -- Full mentor conversation history, so /mentor/chat can show prior turns
 -- instead of answering each message with no memory of the conversation.
 CREATE TABLE IF NOT EXISTS mentor_chat (

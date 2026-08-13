@@ -128,6 +128,17 @@ class Career(BaseModel):
     emerging: bool = False
 
 
+class CollegeDirectoryEntry(BaseModel):
+    id: str
+    name: str
+    location: str
+    state: str
+    type: str
+    established: Optional[int] = None
+    website: Optional[str] = None
+    known_for: list[str] = Field(default_factory=list)
+
+
 # ---------- Score ----------
 
 class CareerMatch(BaseModel):
