@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" font-family="Segoe UI, Arial, sans-serif">
+  <rect width="1280" height="720" fill="#14120f"/>
+
+  <text x="640" y="55" text-anchor="middle" fill="#f2efe9" font-size="30" font-weight="600">Career Mentor — System Architecture</text>
+
+  <!-- User -->
+  <rect x="560" y="90" width="160" height="55" rx="10" fill="#1c1a16" stroke="#a39d90" stroke-width="1.5"/>
+  <text x="640" y="123" text-anchor="middle" fill="#f2efe9" font-size="18">Student / User</text>
+
+  <!-- Frontend -->
+  <rect x="440" y="190" width="400" height="110" rx="12" fill="#1c1a16" stroke="#d4a94c" stroke-width="2"/>
+  <text x="640" y="220" text-anchor="middle" fill="#d4a94c" font-size="20" font-weight="600">Frontend — Streamlit</text>
+  <text x="640" y="248" text-anchor="middle" fill="#a39d90" font-size="15">Assessment · Dashboard · Roadmap</text>
+  <text x="640" y="270" text-anchor="middle" fill="#a39d90" font-size="15">Mentor Chat · Colleges · Scholarships · Admin</text>
+  <text x="640" y="292" text-anchor="middle" fill="#6f6a5f" font-size="13">Streamlit Community Cloud</text>
+
+  <!-- Backend -->
+  <rect x="440" y="360" width="400" height="130" rx="12" fill="#1c1a16" stroke="#d4a94c" stroke-width="2"/>
+  <text x="640" y="392" text-anchor="middle" fill="#d4a94c" font-size="20" font-weight="600">Backend — FastAPI</text>
+  <text x="640" y="420" text-anchor="middle" fill="#a39d90" font-size="15">Auth (JWT) · Profile &amp; Scoring</text>
+  <text x="640" y="442" text-anchor="middle" fill="#a39d90" font-size="15">Roadmap · Mentor · Bookmarks · Admin CRUD</text>
+  <text x="640" y="464" text-anchor="middle" fill="#a39d90" font-size="15">Career matching engine (rule-based, explainable)</text>
+  <text x="640" y="482" text-anchor="middle" fill="#6f6a5f" font-size="13">Render (free web service)</text>
+
+  <!-- Database -->
+  <rect x="200" y="560" width="330" height="110" rx="12" fill="#1c1a16" stroke="#4c9fd4" stroke-width="2"/>
+  <text x="365" y="592" text-anchor="middle" fill="#4c9fd4" font-size="20" font-weight="600">Database — MySQL</text>
+  <text x="365" y="620" text-anchor="middle" fill="#a39d90" font-size="15">Students · Careers · Colleges</text>
+  <text x="365" y="642" text-anchor="middle" fill="#a39d90" font-size="15">Chat · Roadmap · Bookmarks</text>
+  <text x="365" y="660" text-anchor="middle" fill="#6f6a5f" font-size="13">Aiven (managed, TLS)</text>
+
+  <!-- LLM -->
+  <rect x="750" y="560" width="330" height="110" rx="12" fill="#1c1a16" stroke="#8fd44c" stroke-width="2"/>
+  <text x="915" y="592" text-anchor="middle" fill="#8fd44c" font-size="20" font-weight="600">AI Layer — LLM</text>
+  <text x="915" y="620" text-anchor="middle" fill="#a39d90" font-size="15">Insights · Roadmap generation</text>
+  <text x="915" y="642" text-anchor="middle" fill="#a39d90" font-size="15">Mentor chat replies</text>
+  <text x="915" y="660" text-anchor="middle" fill="#6f6a5f" font-size="13">Gemini (default) / OpenAI / Ollama · fallback on failure</text>
+
+  <!-- Arrows -->
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#a39d90"/>
+    </marker>
+  </defs>
+
+  <line x1="640" y1="145" x2="640" y2="188" stroke="#a39d90" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <line x1="640" y1="300" x2="640" y2="358" stroke="#a39d90" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="660" y="333" fill="#6f6a5f" font-size="13">HTTPS / JWT Bearer</text>
+
+  <line x1="560" y1="490" x2="400" y2="558" stroke="#a39d90" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="420" y="530" fill="#6f6a5f" font-size="13">SQL (TLS)</text>
+
+  <line x1="720" y1="490" x2="880" y2="558" stroke="#a39d90" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="810" y="530" fill="#6f6a5f" font-size="13">HTTPS</text>
+
+  <text x="640" y="705" text-anchor="middle" fill="#6f6a5f" font-size="13">Free-tier keep-alive ping hits GET /health every ~10 min to stop Render cold-sleep</text>
+</svg>
