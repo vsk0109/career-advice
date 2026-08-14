@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1100" viewBox="0 0 1600 1100" font-family="Segoe UI, Arial, sans-serif">
+  <rect width="1600" height="1100" fill="#14120f"/>
+
+  <text x="800" y="45" text-anchor="middle" fill="#f2efe9" font-size="28" font-weight="600">Career Mentor — Detailed Architecture</text>
+
+  <!-- User -->
+  <rect x="700" y="70" width="200" height="50" rx="10" fill="#1c1a16" stroke="#a39d90" stroke-width="1.5"/>
+  <text x="800" y="101" text-anchor="middle" fill="#f2efe9" font-size="16">Student / Browser</text>
+
+  <!-- Frontend -->
+  <rect x="250" y="150" width="1100" height="150" rx="12" fill="#1c1a16" stroke="#d4a94c" stroke-width="2"/>
+  <text x="270" y="180" fill="#d4a94c" font-size="19" font-weight="600">Frontend — Streamlit  (Streamlit Community Cloud, single-file app.py)</text>
+  <text x="270" y="210" fill="#c9c4b8" font-size="14">Pages:  Auth (login/signup/forgot-password)  ·  Assessment (RIASEC + marks + skills)  ·  Dashboard (ranked matches)  ·  Roadmap (checklist)</text>
+  <text x="270" y="234" fill="#c9c4b8" font-size="14">Mentor (chat)  ·  Explore (compare careers / bookmarks / deadlines / directory)  ·  Colleges (directory)  ·  Scholarships (catalog)  ·  Admin (CRUD)</text>
+  <text x="270" y="262" fill="#a39d90" font-size="13">State: st.session_state caches profile/score/insights/bookmarks; JWT mirrored into URL query string so refresh doesn't log out</text>
+  <text x="270" y="284" fill="#6f6a5f" font-size="12">api_client.py — server-to-server HTTP calls via requests, secrets from st.secrets / .env</text>
+
+  <line x1="800" y1="120" x2="800" y2="148" stroke="#a39d90" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Backend -->
+  <rect x="250" y="340" width="1100" height="270" rx="12" fill="#1c1a16" stroke="#d4a94c" stroke-width="2"/>
+  <text x="270" y="370" fill="#d4a94c" font-size="19" font-weight="600">Backend — FastAPI  (Render, free web service, port $PORT)</text>
+
+  <text x="270" y="400" fill="#e8c977" font-size="15" font-weight="600">Routers</text>
+  <text x="270" y="422" fill="#c9c4b8" font-size="13.5">/auth  (signup, login, me, change-password, forgot/reset-password)</text>
+  <text x="270" y="444" fill="#c9c4b8" font-size="13.5">/profile  ·  /careers  ·  /colleges  (public read)</text>
+  <text x="270" y="466" fill="#c9c4b8" font-size="13.5">/score , /score/insights  (ranking + LLM explanations)</text>
+  <text x="270" y="488" fill="#c9c4b8" font-size="13.5">/mentor/chat  ·  /roadmap  ·  /bookmarks  ·  /admin/careers  (admin-only)</text>
+  <text x="270" y="514" fill="#8f897b" font-size="12.5">GET /health — polled by keep-alive to prevent Render cold-sleep</text>
+
+  <text x="820" y="400" fill="#e8c977" font-size="15" font-weight="600">Services</text>
+  <text x="820" y="422" fill="#c9c4b8" font-size="13.5">auth.py — bcrypt password hashing + JWT issue/verify</text>
+  <text x="820" y="444" fill="#c9c4b8" font-size="13.5">db.py — PyMySQL access layer, init_db() creates/seeds schema on boot</text>
+  <text x="820" y="466" fill="#c9c4b8" font-size="13.5">scoring_engine.py — pure-Python, deterministic, explainable</text>
+  <text x="820" y="488" fill="#c9c4b8" font-size="13.5">   weights: RIASEC 40% · Academic fit 30% · Interests 20% · Skill gaps 10%</text>
+  <text x="820" y="510" fill="#c9c4b8" font-size="13.5">llm_client.py — provider wrapper (insights, mentor replies, resume prep)</text>
+  <text x="820" y="532" fill="#8f897b" font-size="12.5">   catches API errors/timeouts → returns pre-written fallback text (demo-safe)</text>
+
+  <text x="270" y="580" fill="#8f897b" font-size="12.5">Every endpoint except /auth/*, GET /careers, GET /colleges requires Authorization: Bearer &lt;JWT&gt;; admin routes also check is_admin</text>
+
+  <line x1="800" y1="300" x2="800" y2="338" stroke="#a39d90" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="815" y="323" fill="#6f6a5f" font-size="12.5">HTTPS / JWT Bearer</text>
+
+  <!-- Database -->
+  <rect x="250" y="680" width="620" height="220" rx="12" fill="#1c1a16" stroke="#4c9fd4" stroke-width="2"/>
+  <text x="270" y="710" fill="#4c9fd4" font-size="19" font-weight="600">Database — MySQL  (Aiven, managed, TLS)</text>
+  <text x="270" y="738" fill="#c9c4b8" font-size="13.5">students · careers · colleges · mentor_chat</text>
+  <text x="270" y="760" fill="#c9c4b8" font-size="13.5">roadmap_steps · insights · bookmarks</text>
+  <text x="270" y="782" fill="#c9c4b8" font-size="13.5">career_prep · password_resets</text>
+  <text x="270" y="810" fill="#8f897b" font-size="12.5">List/dict fields stored as JSON columns (small curated dataset,</text>
+  <text x="270" y="828" fill="#8f897b" font-size="12.5">no join overhead needed)</text>
+  <text x="270" y="854" fill="#8f897b" font-size="12.5">init_db() auto-applies database/schema.sql and seeds careers_seed.json /</text>
+  <text x="270" y="872" fill="#8f897b" font-size="12.5">colleges_seed.json on first boot; ALTER TABLE migration checks after that</text>
+
+  <!-- LLM -->
+  <rect x="930" y="680" width="420" height="220" rx="12" fill="#1c1a16" stroke="#8fd44c" stroke-width="2"/>
+  <text x="950" y="710" fill="#8fd44c" font-size="19" font-weight="600">AI Layer — LLM (pluggable)</text>
+  <text x="950" y="738" fill="#c9c4b8" font-size="13.5">Gemini (default, gemini-1.5-flash)</text>
+  <text x="950" y="760" fill="#c9c4b8" font-size="13.5">OpenAI (gpt-4o-mini)  ·  Ollama (local, llama3.2)</text>
+  <text x="950" y="788" fill="#c9c4b8" font-size="13.5">Used for: career insights + roadmap text,</text>
+  <text x="950" y="808" fill="#c9c4b8" font-size="13.5">mentor chat replies, resume/interview prep</text>
+  <text x="950" y="836" fill="#8f897b" font-size="12.5">Selected via LLM_PROVIDER env var; on failure/timeout</text>
+  <text x="950" y="854" fill="#8f897b" font-size="12.5">falls back to a pre-written template so the demo never breaks</text>
+
+  <line x1="560" y1="610" x2="560" y2="678" stroke="#a39d90" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="575" y="648" fill="#6f6a5f" font-size="12.5">SQL (TLS)</text>
+
+  <line x1="1140" y1="610" x2="1140" y2="678" stroke="#a39d90" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="1155" y="648" fill="#6f6a5f" font-size="12.5">HTTPS</text>
+
+  <!-- Deployment / keep-alive footer -->
+  <rect x="250" y="940" width="1100" height="120" rx="12" fill="#1c1a16" stroke="#6f6a5f" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <text x="270" y="968" fill="#a39d90" font-size="15" font-weight="600">Deployment &amp; Uptime</text>
+  <text x="270" y="992" fill="#8f897b" font-size="13">Frontend → Streamlit Community Cloud   ·   Backend → Render (free web service, render.yaml blueprint)   ·   DB → Aiven (free managed MySQL)</text>
+  <text x="270" y="1014" fill="#8f897b" font-size="13">scripts/keep-alive.sh (cron, every ~10 min) or an external ping service hits GET /health on the backend and the frontend URL</text>
+  <text x="270" y="1036" fill="#8f897b" font-size="13">to prevent Render's free tier from sleeping the service after 15 minutes idle (avoids the ~30-50s cold-start penalty)</text>
+
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#a39d90"/>
+    </marker>
+  </defs>
+</svg>
